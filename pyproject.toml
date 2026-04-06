@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "fair-j"
+version = "0.1.0"
+description = "Research project for checking LLM-as-a-Judge reliability."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "instructor>=1.0.0",
+  "openai>=1.0.0",
+  "pyarrow>=16.0.0",
+  "pydantic>=2.0.0",
+  "scipy>=1.14.0",
+]
+
+[project.scripts]
+fair-j = "fair_j.cli:main"

@@ -1,0 +1,17 @@
+{
+  "name": "tiny_summary_rubric",
+  "scale": {
+    "min": 1,
+    "max": 5
+  },
+  "criteria": [
+    {
+      "id": "coherence",
+      "text": "The candidate should be easy to follow."
+    },
+    {
+      "id": "relevance",
+      "text": "The candidate should focus on the important information."
+    }
+  ]
+}

@@ -1,0 +1,350 @@
+from __future__ import annotations
+
+import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
+from pathlib import Path
+from typing import TYPE_CHECKING, Callable
+
+if TYPE_CHECKING:
+    import instructor
+
+from fair_j.io_utils import (
+    append_jsonl,
+    load_dataset_examples,
+    load_rubric,
+    load_variants,
+    read_jsonl,
+    write_json,
+)
+from fair_j.openrouter_judge import build_judge_client, call_openrouter_judge
+from fair_j.perturbations import make_variants
+from fair_j.schemas import (
+    AdapterInput,
+    CallLogRow,
+    DatasetExample,
+    RubricVariant,
+    RunMetadata,
+    ScoreLogRow,
+)
+
+
+@dataclass(frozen=True)
+class PendingCall:
+    call_id: str
+    example: DatasetExample
+    variant: RubricVariant
+    seed: int
+    prompt_text: str
+
+
+def run_adapter(
+    adapter_input: AdapterInput,
+    run_dir: Path,
+    subset_name: str,
+    seeds: int,
+    workers: int = 10,
+    progress_callback: Callable[[int, int], None] | None = None,
+) -> dict[str, int | str]:
+    dataset = load_dataset_examples(adapter_input.dataset_path)
+    rubric = load_rubric(adapter_input.rubric_path)
+    run_metadata = RunMetadata(
+        judge_model=adapter_input.judge_model,
+        paraphrase_model=adapter_input.paraphrase_model,
+        dataset_path=str(adapter_input.dataset_path),
+        rubric_path=str(adapter_input.rubric_path),
+        subset_name=subset_name,
+        scale_min=rubric.scale_min,
+        scale_max=rubric.scale_max,
+    )
+
+    write_json(run_dir / "run.json", run_metadata)
+
+    variants_path = run_dir / "variants.json"
+    if variants_path.exists():
+        variants = load_variants(variants_path)
+    else:
+        variants = make_variants(
+            rubric=rubric,
+            paraphrase_model=adapter_input.paraphrase_model,
+            openrouter_api_key=adapter_input.openrouter_api_key,
+        )
+        write_json(variants_path, variants)
+
+    call_log_path = run_dir / "call_log.jsonl"
+    score_log_path = run_dir / "score_log.jsonl"
+    call_log_path.touch(exist_ok=True)
+    score_log_path.touch(exist_ok=True)
+
+    completed = resume_state_from_score_log(run_dir, variants)
+    next_call_number = get_next_call_number(run_dir)
+    pending_calls = collect_pending_calls(
+        dataset=dataset,
+        variants=variants,
+        seeds=seeds,
+        completed=completed,
+        scale_min=rubric.scale_min,
+        scale_max=rubric.scale_max,
+        next_call_number=next_call_number,
+    )
+    judge_client = build_judge_client(adapter_input) if workers == 1 else None
+    written_calls = 0
+    total_calls = len(dataset) * len(variants) * seeds
+
+    skipped_calls = total_calls - len(pending_calls)
+    report_progress(progress_callback, len(completed), total_calls)
+
+    if workers == 1:
+        assert judge_client is not None
+        for pending_call in pending_calls:
+            report_call_event("started", pending_call)
+            try:
+                write_completed_call(
+                    call_log_path=call_log_path,
+                    score_log_path=score_log_path,
+                    pending_call=pending_call,
+                    scores_and_output=get_pending_call_scores(
+                        adapter_input=adapter_input,
+                        judge_client=judge_client,
+                        pending_call=pending_call,
+                        scale_min=rubric.scale_min,
+                        scale_max=rubric.scale_max,
+                    ),
+                )
+            except Exception:
+                report_call_event("failed", pending_call)
+                raise
+            written_calls += 1
+            report_call_event("completed", pending_call)
+            report_progress(progress_callback, len(completed) + written_calls, total_calls)
+    else:
+        written_calls = run_openrouter_pending_calls(
+            adapter_input=adapter_input,
+            pending_calls=pending_calls,
+            call_log_path=call_log_path,
+            score_log_path=score_log_path,
+            written_calls=written_calls,
+            scale_min=rubric.scale_min,
+            scale_max=rubric.scale_max,
+            workers=workers,
+            progress_callback=progress_callback,
+            initial_completed=len(completed),
+            total_calls=total_calls,
+        )
+
+    return {
+        "examples": len(dataset),
+        "variants": len(variants),
+        "seeds": seeds,
+        "completed_calls": len(completed),
+        "written_calls": written_calls,
+        "skipped_calls": skipped_calls,
+        "run_dir": str(run_dir),
+    }
+
+
+def collect_pending_calls(
+    dataset: list[DatasetExample],
+    variants: list[RubricVariant],
+    seeds: int,
+    completed: set[tuple[str, str, int]],
+    scale_min: int | float,
+    scale_max: int | float,
+    next_call_number: int,
+) -> list[PendingCall]:
+    pending_calls: list[PendingCall] = []
+    call_number = next_call_number
+    for example in dataset:
+        for variant in variants:
+            for seed in range(seeds):
+                call_key = (example.id, variant.perturbation, seed)
+                if call_key in completed:
+                    continue
+
+                pending_calls.append(
+                    PendingCall(
+                        call_id=format_call_id(call_number),
+                        example=example,
+                        variant=variant,
+                        seed=seed,
+                        prompt_text=build_judge_prompt(
+                            example=example,
+                            variant=variant,
+                            scale_min=scale_min,
+                            scale_max=scale_max,
+                        ),
+                    )
+                )
+                call_number += 1
+    return pending_calls
+
+
+def get_pending_call_scores(
+    adapter_input: AdapterInput,
+    judge_client: instructor.Instructor,
+    pending_call: PendingCall,
+    scale_min: int | float,
+    scale_max: int | float,
+) -> tuple[dict[str, int | float], str]:
+    expected_ids = {criterion.id for criterion in pending_call.variant.criteria}
+    return call_openrouter_judge(
+        judge_client=judge_client,
+        adapter_input=adapter_input,
+        judge_model=adapter_input.judge_model,
+        expected_ids=expected_ids,
+        scale_min=scale_min,
+        scale_max=scale_max,
+        prompt_text=pending_call.prompt_text,
+    )
+
+
+def write_completed_call(
+    call_log_path: Path,
+    score_log_path: Path,
+    pending_call: PendingCall,
+    scores_and_output: tuple[dict[str, int | float], str],
+) -> None:
+    scores, raw_model_output = scores_and_output
+    call_row = CallLogRow(
+        call_id=pending_call.call_id,
+        example_id=pending_call.example.id,
+        perturbation=pending_call.variant.perturbation,
+        seed=pending_call.seed,
+        prompt_text=pending_call.prompt_text,
+        raw_model_output=raw_model_output,
+    )
+    score_rows = [
+        ScoreLogRow(
+            call_id=pending_call.call_id,
+            example_id=pending_call.example.id,
+            criterion_id=criterion.id,
+            perturbation=pending_call.variant.perturbation,
+            seed=pending_call.seed,
+            score=scores[criterion.id],
+        )
+        for criterion in pending_call.variant.criteria
+    ]
+
+    append_jsonl(call_log_path, [call_row])
+    append_jsonl(score_log_path, score_rows)
+
+
+def run_openrouter_pending_calls(
+    adapter_input: AdapterInput,
+    pending_calls: list[PendingCall],
+    call_log_path: Path,
+    score_log_path: Path,
+    written_calls: int,
+    scale_min: int | float,
+    scale_max: int | float,
+    workers: int,
+    progress_callback: Callable[[int, int], None] | None,
+    initial_completed: int,
+    total_calls: int,
+) -> int:
+    completed_futures = 0
+
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        future_to_index = {}
+        for index, pending_call in enumerate(pending_calls):
+            report_call_event("started", pending_call)
+            future = executor.submit(
+                get_pending_call_scores,
+                adapter_input=adapter_input,
+                judge_client=build_judge_client(adapter_input),
+                pending_call=pending_call,
+                scale_min=scale_min,
+                scale_max=scale_max,
+            )
+            future_to_index[future] = index
+
+        for future in as_completed(future_to_index):
+            index = future_to_index[future]
+            pending_call = pending_calls[index]
+            try:
+                scores_and_output = future.result()
+            except Exception:
+                report_call_event("failed", pending_call)
+                raise
+
+            completed_futures += 1
+            write_completed_call(
+                call_log_path=call_log_path,
+                score_log_path=score_log_path,
+                pending_call=pending_call,
+                scores_and_output=scores_and_output,
+            )
+            report_call_event("completed", pending_call)
+            report_progress(progress_callback, initial_completed + completed_futures, total_calls)
+            written_calls += 1
+
+    return written_calls
+
+
+def report_progress(
+    progress_callback: Callable[[int, int], None] | None,
+    current: int,
+    total: int,
+) -> None:
+    if progress_callback is None:
+        return
+    progress_callback(current, total)
+
+
+def resume_state_from_score_log(
+    run_dir: Path,
+    variants: list[RubricVariant],
+) -> set[tuple[str, str, int]]:
+    score_rows = read_jsonl(run_dir / "score_log.jsonl")
+    expected_counts = {
+        variant.perturbation: len(variant.criteria)
+        for variant in variants
+    }
+    counts: dict[tuple[str, str, int], int] = {}
+    for row in score_rows:
+        key = (row["example_id"], row["perturbation"], int(row["seed"]))
+        counts[key] = counts.get(key, 0) + 1
+
+    return {
+        key
+        for key, count in counts.items()
+        if count >= expected_counts.get(key[1], 0)
+    }
+
+
+def get_next_call_number(run_dir: Path) -> int:
+    call_rows = read_jsonl(run_dir / "call_log.jsonl")
+    return len(call_rows) + 1
+
+
+def format_call_id(call_number: int) -> str:
+    return f"call_{call_number:06d}"
+
+
+def build_judge_prompt(
+    example: DatasetExample,
+    variant: RubricVariant,
+    scale_min: int | float,
+    scale_max: int | float,
+) -> str:
+    criteria_lines = "\n".join(f"- {criterion.id}: {criterion.text}" for criterion in variant.criteria)
+    return (
+        f"Context:\n{example.context}\n\n"
+        f"Candidate:\n{example.candidate}\n\n"
+        f"Score each criterion on the scale [{scale_min}, {scale_max}].\n"
+        f"Criteria:\n{criteria_lines}\n\n"
+        "Return structured output with one numeric score for each criterion id."
+    )
+
+
+def report_call_event(status: str, pending_call: PendingCall) -> None:
+    sys.stderr.write(f"\n[{status}] {format_pending_call_label(pending_call)}\n")
+    sys.stderr.flush()
+
+
+def format_pending_call_label(pending_call: PendingCall) -> str:
+    return (
+        f"example_id={pending_call.example.id} "
+        f"perturbation={pending_call.variant.perturbation} "
+        f"seed={pending_call.seed}"
+    )
