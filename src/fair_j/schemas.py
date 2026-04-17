@@ -12,6 +12,9 @@ class AdapterInput:
     openrouter_api_key: str
     dataset_path: Path
     rubric_path: Path
+    dataset_id_column: str = "id"
+    dataset_context_column: str = "context"
+    dataset_candidate_column: str = "candidate"
     provider_only: str | None = None
     provider_quantization: str | None = None
     request_timeout_seconds: float = 90.0
@@ -55,6 +58,10 @@ class RunMetadata:
     subset_name: str
     scale_min: int | float
     scale_max: int | float
+    dataset_format: str | None = None
+    dataset_id_column: str = "id"
+    dataset_context_column: str = "context"
+    dataset_candidate_column: str = "candidate"
 
 
 @dataclass
@@ -74,7 +81,7 @@ class ScoreLogRow:
     criterion_id: str
     perturbation: str
     seed: int
-    score: int | float
+    score: int
     metadata: dict[str, Any] = field(default_factory=dict)
 
 

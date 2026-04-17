@@ -4,13 +4,11 @@ import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable
-
-if TYPE_CHECKING:
-    import instructor
+from typing import Callable
 
 from fair_j.io_utils import (
     append_jsonl,
+    infer_dataset_format,
     load_dataset_examples,
     load_rubric,
     load_variants,
@@ -38,7 +36,7 @@ class PendingCall:
     prompt_text: str
 
 
-def run_adapter(
+def run_judge(
     adapter_input: AdapterInput,
     run_dir: Path,
     subset_name: str,
@@ -46,7 +44,12 @@ def run_adapter(
     workers: int = 10,
     progress_callback: Callable[[int, int], None] | None = None,
 ) -> dict[str, int | str]:
-    dataset = load_dataset_examples(adapter_input.dataset_path)
+    dataset = load_dataset_examples(
+        adapter_input.dataset_path,
+        id_column=adapter_input.dataset_id_column,
+        context_column=adapter_input.dataset_context_column,
+        candidate_column=adapter_input.dataset_candidate_column,
+    )
     rubric = load_rubric(adapter_input.rubric_path)
     run_metadata = RunMetadata(
         judge_model=adapter_input.judge_model,
@@ -56,6 +59,10 @@ def run_adapter(
         subset_name=subset_name,
         scale_min=rubric.scale_min,
         scale_max=rubric.scale_max,
+        dataset_format=infer_dataset_format(adapter_input.dataset_path),
+        dataset_id_column=adapter_input.dataset_id_column,
+        dataset_context_column=adapter_input.dataset_context_column,
+        dataset_candidate_column=adapter_input.dataset_candidate_column,
     )
 
     write_json(run_dir / "run.json", run_metadata)
@@ -87,50 +94,22 @@ def run_adapter(
         scale_max=rubric.scale_max,
         next_call_number=next_call_number,
     )
-    judge_client = build_judge_client(adapter_input) if workers == 1 else None
-    written_calls = 0
     total_calls = len(dataset) * len(variants) * seeds
 
     skipped_calls = total_calls - len(pending_calls)
     report_progress(progress_callback, len(completed), total_calls)
-
-    if workers == 1:
-        assert judge_client is not None
-        for pending_call in pending_calls:
-            report_call_event("started", pending_call)
-            try:
-                write_completed_call(
-                    call_log_path=call_log_path,
-                    score_log_path=score_log_path,
-                    pending_call=pending_call,
-                    scores_and_output=get_pending_call_scores(
-                        adapter_input=adapter_input,
-                        judge_client=judge_client,
-                        pending_call=pending_call,
-                        scale_min=rubric.scale_min,
-                        scale_max=rubric.scale_max,
-                    ),
-                )
-            except Exception:
-                report_call_event("failed", pending_call)
-                raise
-            written_calls += 1
-            report_call_event("completed", pending_call)
-            report_progress(progress_callback, len(completed) + written_calls, total_calls)
-    else:
-        written_calls = run_openrouter_pending_calls(
-            adapter_input=adapter_input,
-            pending_calls=pending_calls,
-            call_log_path=call_log_path,
-            score_log_path=score_log_path,
-            written_calls=written_calls,
-            scale_min=rubric.scale_min,
-            scale_max=rubric.scale_max,
-            workers=workers,
-            progress_callback=progress_callback,
-            initial_completed=len(completed),
-            total_calls=total_calls,
-        )
+    written_calls = run_pending_calls(
+        adapter_input=adapter_input,
+        pending_calls=pending_calls,
+        call_log_path=call_log_path,
+        score_log_path=score_log_path,
+        scale_min=rubric.scale_min,
+        scale_max=rubric.scale_max,
+        workers=workers,
+        progress_callback=progress_callback,
+        initial_completed=len(completed),
+        total_calls=total_calls,
+    )
 
     return {
         "examples": len(dataset),
@@ -141,6 +120,10 @@ def run_adapter(
         "skipped_calls": skipped_calls,
         "run_dir": str(run_dir),
     }
+
+
+# Backwards-compatible alias for older imports.
+run_adapter = run_judge
 
 
 def collect_pending_calls(
@@ -181,14 +164,13 @@ def collect_pending_calls(
 
 def get_pending_call_scores(
     adapter_input: AdapterInput,
-    judge_client: instructor.Instructor,
     pending_call: PendingCall,
     scale_min: int | float,
     scale_max: int | float,
 ) -> tuple[dict[str, int | float], str]:
     expected_ids = {criterion.id for criterion in pending_call.variant.criteria}
     return call_openrouter_judge(
-        judge_client=judge_client,
+        judge_client=build_judge_client(adapter_input),
         adapter_input=adapter_input,
         judge_model=adapter_input.judge_model,
         expected_ids=expected_ids,
@@ -229,12 +211,11 @@ def write_completed_call(
     append_jsonl(score_log_path, score_rows)
 
 
-def run_openrouter_pending_calls(
+def run_pending_calls(
     adapter_input: AdapterInput,
     pending_calls: list[PendingCall],
     call_log_path: Path,
     score_log_path: Path,
-    written_calls: int,
     scale_min: int | float,
     scale_max: int | float,
     workers: int,
@@ -245,22 +226,20 @@ def run_openrouter_pending_calls(
     completed_futures = 0
 
     with ThreadPoolExecutor(max_workers=workers) as executor:
-        future_to_index = {}
-        for index, pending_call in enumerate(pending_calls):
+        future_to_call = {}
+        for pending_call in pending_calls:
             report_call_event("started", pending_call)
             future = executor.submit(
                 get_pending_call_scores,
                 adapter_input=adapter_input,
-                judge_client=build_judge_client(adapter_input),
                 pending_call=pending_call,
                 scale_min=scale_min,
                 scale_max=scale_max,
             )
-            future_to_index[future] = index
+            future_to_call[future] = pending_call
 
-        for future in as_completed(future_to_index):
-            index = future_to_index[future]
-            pending_call = pending_calls[index]
+        for future in as_completed(future_to_call):
+            pending_call = future_to_call[future]
             try:
                 scores_and_output = future.result()
             except Exception:
@@ -276,9 +255,8 @@ def run_openrouter_pending_calls(
             )
             report_call_event("completed", pending_call)
             report_progress(progress_callback, initial_completed + completed_futures, total_calls)
-            written_calls += 1
 
-    return written_calls
+    return completed_futures
 
 
 def report_progress(

@@ -12,14 +12,16 @@ from fair_j.schemas import AdapterInput
 
 
 class JudgeResponse(BaseModel):
-    scores: dict[str, float] = Field(description="Mapping from criterion id to numeric score.")
+    scores: dict[str, int] = Field(description="Mapping from criterion id to integer score.")
 
 
 def build_judge_system_prompt() -> str:
     return (
         "You are a judge model. Reply with valid JSON only. "
         "Return an object with a top-level key 'scores' whose value is an object "
-        "mapping each criterion id to one numeric score. Do not include any extra text."
+        "mapping each criterion id to one integer score. "
+        "Every score must be a whole number on the rubric scale. "
+        "Do not include any extra text."
     )
 
 
@@ -45,6 +47,33 @@ def build_openrouter_provider_preferences(adapter_input: AdapterInput) -> dict[s
     if adapter_input.provider_quantization:
         provider["quantizations"] = [adapter_input.provider_quantization]
     return provider or None
+
+
+def build_judge_response_format(expected_ids: set[str]) -> dict[str, object]:
+    sorted_ids = sorted(expected_ids)
+    return {
+        "type": "json_schema",
+        "json_schema": {
+            "name": "judge_scores",
+            "strict": True,
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "scores": {
+                        "type": "object",
+                        "properties": {
+                            criterion_id: {"type": "integer"}
+                            for criterion_id in sorted_ids
+                        },
+                        "required": sorted_ids,
+                        "additionalProperties": False,
+                    }
+                },
+                "required": ["scores"],
+                "additionalProperties": False,
+            },
+        },
+    }
 
 
 def build_openrouter_extra_body(adapter_input: AdapterInput) -> dict[str, object] | None:
@@ -139,7 +168,7 @@ def call_openrouter_judge_json_object(
     completion = openai_client.chat.completions.create(
         model=judge_model,
         temperature=0,
-        response_format={"type": "json_object"},
+        response_format=build_judge_response_format(expected_ids),
         extra_body=build_openrouter_extra_body(adapter_input),
         messages=[
             {
@@ -235,18 +264,20 @@ def report_retry_error(
 
 
 def validate_openrouter_scores(
-    scores: dict[str, float],
+    scores: dict[str, int | float],
     expected_ids: set[str],
     scale_min: int | float,
     scale_max: int | float,
-) -> dict[str, int | float]:
+) -> dict[str, int]:
     if set(scores) != expected_ids:
         raise ValueError("Structured response does not contain exactly the expected criterion ids.")
 
-    validated: dict[str, int | float] = {}
+    validated: dict[str, int] = {}
     for criterion_id, score in scores.items():
         numeric_score = float(score)
         if numeric_score < scale_min or numeric_score > scale_max:
             raise ValueError("Structured response contains a score outside the rubric scale.")
-        validated[criterion_id] = numeric_score
+        if not numeric_score.is_integer():
+            raise ValueError("Structured response contains a non-integer score on an integer rubric.")
+        validated[criterion_id] = int(numeric_score)
     return validated

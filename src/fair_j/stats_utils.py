@@ -3,9 +3,14 @@ from __future__ import annotations
 from math import sqrt
 
 import numpy as np
-from scipy.stats import permutation_test, ttest_rel, wilcoxon
+from scipy.stats import permutation_test, tstd, ttest_rel, wilcoxon
+from statsmodels.stats.power import TTestPower
 
 from fair_j.score_grouping import perturbation_group_name
+
+PAIRED_T_TEST_ALPHA = 0.05
+PAIRED_T_TEST_POWER = 0.80
+_TTEST_POWER_ANALYSIS = TTestPower()
 
 
 def compute_std_seed_default(
@@ -83,10 +88,24 @@ def build_stat_test_block(group_comparison: dict[str, list[float]]) -> dict[str,
     baseline = group_comparison["baseline"]
     perturbation = group_comparison["perturbation"]
     differences = group_comparison["differences"]
+    mean_difference = mean_or_none(differences)
+    effect_size_dz = paired_effect_size_dz(differences)
+    mde_effect_size_dz = paired_mde_effect_size_dz(len(differences))
+    mde_mean_difference = scale_effect_size_to_mean_difference(mde_effect_size_dz, differences)
     return {
         "tested_quantity": "difference_vs_zero",
         "alternative": "two_sided",
         "n_pairs": len(differences),
+        "mean_difference": mean_difference,
+        "mde_mean_difference": mde_mean_difference,
+        "effect_size_dz": effect_size_dz,
+        "mde_effect_size_dz": mde_effect_size_dz,
+        "observed_abs_mean_difference_over_mde": ratio_or_none(
+            abs(mean_difference) if mean_difference is not None else None,
+            mde_mean_difference,
+        ),
+        "alpha": PAIRED_T_TEST_ALPHA,
+        "target_power": PAIRED_T_TEST_POWER,
         "tests": {
             "paired_permutation_test": {
                 "p_value": paired_permutation_test(differences),
@@ -153,9 +172,55 @@ def normalized_std(values: list[float], n_examples: int) -> float | None:
 def raw_std(values: list[float]) -> float | None:
     if len(values) < 2:
         return None
-    mean_value = sum(values) / len(values)
-    variance = sum((value - mean_value) ** 2 for value in values) / (len(values) - 1)
-    return sqrt(variance)
+    return float(tstd(np.asarray(values, dtype=float)))
+
+
+def bias_to_mae_ratio(differences: list[float]) -> float | None:
+    return ratio_or_none(mean_or_none(differences), mean_absolute_or_none(differences))
+
+
+def paired_effect_size_dz(differences: list[float]) -> float | None:
+    std_difference = raw_std(differences)
+    if std_difference in (None, 0):
+        return None
+    mean_difference = mean_or_none(differences)
+    if mean_difference is None:
+        return None
+    return mean_difference / std_difference
+
+
+def paired_mde_effect_size_dz(
+    n_pairs: int,
+    alpha: float = PAIRED_T_TEST_ALPHA,
+    power: float = PAIRED_T_TEST_POWER,
+) -> float | None:
+    if n_pairs < 2:
+        return None
+    return float(
+        _TTEST_POWER_ANALYSIS.solve_power(
+            effect_size=None,
+            nobs=n_pairs,
+            alpha=alpha,
+            power=power,
+            alternative="two-sided",
+        )
+    )
+
+
+def scale_effect_size_to_mean_difference(
+    effect_size: float | None,
+    differences: list[float],
+) -> float | None:
+    std_difference = raw_std(differences)
+    if effect_size is None or std_difference is None:
+        return None
+    return abs(effect_size) * std_difference
+
+
+def ratio_or_none(numerator: float | None, denominator: float | None) -> float | None:
+    if numerator is None or denominator in (None, 0):
+        return None
+    return numerator / denominator
 
 
 def normalize_uncertainty(value: float | None, n_examples: int) -> float | None:

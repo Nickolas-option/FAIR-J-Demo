@@ -4,8 +4,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from fair_j.adapter import run_adapter
-from fair_j.core import run_core
+from fair_j.evaluate_judge import evaluate_judge
 from fair_j.io_utils import (
     build_default_run_dir,
     create_run_dir,
@@ -15,6 +14,7 @@ from fair_j.io_utils import (
 )
 from fair_j.perturbations import make_variants
 from fair_j.report_html import render_comparison_report
+from fair_j.run_judge import run_judge
 from fair_j.schemas import AdapterInput
 
 
@@ -30,38 +30,23 @@ def build_parser() -> argparse.ArgumentParser:
     make_variants_parser.set_defaults(func=cmd_make_variants)
 
     run_adapter_parser = subparsers.add_parser("run-adapter")
-    run_adapter_parser.add_argument("--judge-model", required=True)
-    run_adapter_parser.add_argument("--paraphrase-model", required=True)
-    run_adapter_parser.add_argument("--openrouter-api-key", required=True)
-    run_adapter_parser.add_argument("--dataset-path", type=Path, required=True)
-    run_adapter_parser.add_argument("--rubric-path", type=Path, required=True)
-    run_adapter_parser.add_argument("--provider")
-    run_adapter_parser.add_argument("--provider-quantization")
-    run_adapter_parser.add_argument("--request-timeout", type=float, default=90.0)
-    run_adapter_parser.add_argument("--subset-name")
-    run_adapter_parser.add_argument("--run-dir", type=Path)
-    run_adapter_parser.add_argument("--seeds", type=int, default=1)
-    run_adapter_parser.add_argument("--workers", type=int, default=25)
-    run_adapter_parser.add_argument("--no-progress", action="store_true")
+    add_pipeline_arguments(run_adapter_parser)
     run_adapter_parser.set_defaults(func=cmd_run_adapter)
 
     run_evaluation_parser = subparsers.add_parser("run-evaluation")
-    run_evaluation_parser.add_argument("--judge-model", required=True)
-    run_evaluation_parser.add_argument("--paraphrase-model", required=True)
-    run_evaluation_parser.add_argument("--openrouter-api-key", required=True)
-    run_evaluation_parser.add_argument("--dataset-path", type=Path, required=True)
-    run_evaluation_parser.add_argument("--rubric-path", type=Path, required=True)
-    run_evaluation_parser.add_argument("--provider")
-    run_evaluation_parser.add_argument("--provider-quantization")
-    run_evaluation_parser.add_argument("--request-timeout", type=float, default=90.0)
-    run_evaluation_parser.add_argument("--subset-name")
-    run_evaluation_parser.add_argument("--run-dir", type=Path)
-    run_evaluation_parser.add_argument("--seeds", type=int, default=1)
-    run_evaluation_parser.add_argument("--workers", type=int, default=25)
-    run_evaluation_parser.add_argument("--no-progress", action="store_true")
+    add_pipeline_arguments(run_evaluation_parser)
     run_evaluation_parser.add_argument("--html-output-path", type=Path)
     run_evaluation_parser.add_argument("--html-title")
     run_evaluation_parser.set_defaults(func=cmd_run_evaluation)
+
+    run_pipeline_parser = subparsers.add_parser(
+        "run-pipeline",
+        help="Unified end-to-end entry point: adapter -> core -> HTML report.",
+    )
+    add_pipeline_arguments(run_pipeline_parser)
+    run_pipeline_parser.add_argument("--html-output-path", type=Path)
+    run_pipeline_parser.add_argument("--html-title")
+    run_pipeline_parser.set_defaults(func=cmd_run_evaluation)
 
     run_core_parser = subparsers.add_parser("run-core")
     run_core_parser.add_argument("--run-dir", type=Path, required=True)
@@ -74,6 +59,25 @@ def build_parser() -> argparse.ArgumentParser:
     render_compare_parser.set_defaults(func=cmd_render_compare_html)
 
     return parser
+
+
+def add_pipeline_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--judge-model", required=True)
+    parser.add_argument("--paraphrase-model", required=True)
+    parser.add_argument("--openrouter-api-key", required=True)
+    parser.add_argument("--dataset-path", type=Path, required=True)
+    parser.add_argument("--rubric-path", type=Path, required=True)
+    parser.add_argument("--id-column", default="id")
+    parser.add_argument("--context-column", default="context")
+    parser.add_argument("--candidate-column", default="candidate")
+    parser.add_argument("--provider")
+    parser.add_argument("--provider-quantization")
+    parser.add_argument("--request-timeout", type=float, default=90.0)
+    parser.add_argument("--subset-name")
+    parser.add_argument("--run-dir", type=Path)
+    parser.add_argument("--seeds", type=int, default=1)
+    parser.add_argument("--workers", type=int, default=25)
+    parser.add_argument("--no-progress", action="store_true")
 
 
 def cmd_make_variants(args: argparse.Namespace) -> None:
@@ -110,7 +114,7 @@ def cmd_run_evaluation(args: argparse.Namespace) -> None:
         f"already_completed={result['completed_calls']}"
     )
 
-    core_output = run_core(run_dir)
+    core_output = evaluate_judge(run_dir)
     print(f"Wrote core output to {run_dir / 'core_output.json'}")
     print(f"Dataset metrics keys: {list(core_output.dataset_level_scores.keys())}")
 
@@ -124,7 +128,7 @@ def cmd_run_evaluation(args: argparse.Namespace) -> None:
 
 
 def cmd_run_core(args: argparse.Namespace) -> None:
-    output = run_core(args.run_dir)
+    output = evaluate_judge(args.run_dir)
     print(f"Wrote core output to {args.run_dir / 'core_output.json'}")
     print(f"Dataset metrics keys: {list(output.dataset_level_scores.keys())}")
 
@@ -162,6 +166,9 @@ def run_adapter_from_args(args: argparse.Namespace) -> dict[str, int | str]:
         openrouter_api_key=args.openrouter_api_key,
         dataset_path=args.dataset_path,
         rubric_path=args.rubric_path,
+        dataset_id_column=args.id_column,
+        dataset_context_column=args.context_column,
+        dataset_candidate_column=args.candidate_column,
         provider_only=args.provider,
         provider_quantization=args.provider_quantization,
         request_timeout_seconds=args.request_timeout,
@@ -178,7 +185,7 @@ def run_adapter_from_args(args: argparse.Namespace) -> dict[str, int | str]:
     )
     run_dir = create_run_dir(run_dir.parent, run_dir.name)
 
-    return run_adapter(
+    return run_judge(
         adapter_input=adapter_input,
         run_dir=run_dir,
         subset_name=subset_name,

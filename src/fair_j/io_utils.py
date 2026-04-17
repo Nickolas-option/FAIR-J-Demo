@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import csv
 import json
 from dataclasses import asdict, is_dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+import pyarrow.parquet as pq
 
 from fair_j.schemas import (
     Criterion,
@@ -71,9 +74,108 @@ def read_jsonl(path: Path) -> list[dict[str, Any]]:
     return rows
 
 
-def load_dataset_examples(dataset_path: Path) -> list[DatasetExample]:
-    rows = read_jsonl(dataset_path)
-    return [DatasetExample(**row) for row in rows]
+def infer_dataset_format(dataset_path: Path) -> str:
+    name = dataset_path.name.lower()
+    suffixes = [suffix.lower() for suffix in dataset_path.suffixes]
+    if name.endswith(".jsonl"):
+        return "jsonl"
+    if suffixes and suffixes[-1] == ".csv":
+        return "csv"
+    if suffixes and suffixes[-1] in {".parquet", ".pq"}:
+        return "parquet"
+    if suffixes and suffixes[-1] == ".json":
+        return "json"
+    raise ValueError(
+        f"Unsupported dataset format for {dataset_path}. Expected one of: .jsonl, .csv, .parquet, .json."
+    )
+
+
+def load_dataset_examples(
+    dataset_path: Path,
+    *,
+    id_column: str = "id",
+    context_column: str = "context",
+    candidate_column: str = "candidate",
+) -> list[DatasetExample]:
+    rows = read_dataset_rows(dataset_path)
+    return [
+        build_dataset_example(
+            row,
+            id_column=id_column,
+            context_column=context_column,
+            candidate_column=candidate_column,
+        )
+        for row in rows
+    ]
+
+
+def read_dataset_rows(dataset_path: Path) -> list[dict[str, Any]]:
+    dataset_format = infer_dataset_format(dataset_path)
+    if dataset_format == "jsonl":
+        return read_jsonl(dataset_path)
+    if dataset_format == "csv":
+        with dataset_path.open("r", encoding="utf-8", newline="") as handle:
+            return [dict(row) for row in csv.DictReader(handle)]
+    if dataset_format == "parquet":
+        table = pq.read_table(dataset_path)
+        return table.to_pylist()
+    if dataset_format == "json":
+        data = read_json(dataset_path)
+        if not isinstance(data, list):
+            raise ValueError(f"Expected a JSON array dataset in {dataset_path}.")
+        return [dict(row) for row in data]
+    raise ValueError(f"Unsupported dataset format for {dataset_path}.")
+
+
+def build_dataset_example(
+    row: dict[str, Any],
+    *,
+    id_column: str,
+    context_column: str,
+    candidate_column: str,
+) -> DatasetExample:
+    missing = [
+        column
+        for column in (id_column, context_column, candidate_column)
+        if column not in row
+    ]
+    if missing:
+        available = ", ".join(sorted(row.keys()))
+        raise ValueError(
+            "Dataset row is missing required columns "
+            f"{missing}. Available columns: [{available}]"
+        )
+
+    metadata = normalize_metadata(row.get("metadata"))
+    for key, value in row.items():
+        if key in {id_column, context_column, candidate_column, "metadata"}:
+            continue
+        if value in (None, ""):
+            continue
+        metadata[key] = value
+
+    return DatasetExample(
+        id=str(row[id_column]),
+        context=str(row[context_column]),
+        candidate=str(row[candidate_column]),
+        metadata=metadata,
+    )
+
+
+def normalize_metadata(value: Any) -> dict[str, Any]:
+    if value is None or value == "":
+        return {}
+    if isinstance(value, dict):
+        return dict(value)
+    if isinstance(value, str):
+        try:
+            loaded = json.loads(value)
+        except json.JSONDecodeError:
+            return {"raw_metadata": value}
+        if isinstance(loaded, dict):
+            return loaded
+        return {"raw_metadata": loaded}
+    return {"raw_metadata": value}
 
 
 def load_rubric(rubric_path: Path) -> Rubric:

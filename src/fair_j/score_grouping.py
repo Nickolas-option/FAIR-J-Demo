@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from itertools import combinations
+
 from scipy.stats import kendalltau
 
 from fair_j.schemas import ScoreLogRow
@@ -87,13 +89,23 @@ def collect_grouped_comparisons(
     return grouped_comparisons
 
 
-def collect_grouped_kendalls(
+def collect_grouped_rank_metrics(
     criterion_scores: dict[str, dict[int, dict[str, float]]],
-) -> dict[str, list[float]]:
+) -> dict[str, dict[str, list[float]]]:
     baseline_by_seed = criterion_scores.get("baseline", {})
-    grouped_kendalls: dict[str, list[float]] = {
-        "paraphrases": [],
-        "deletions": [],
+    grouped_metrics: dict[str, dict[str, list[float]]] = {
+        "paraphrases": {
+            "tau_b": [],
+            "tie_pct": [],
+            "concordant_pairs": [],
+            "discordant_pairs": [],
+        },
+        "deletions": {
+            "tau_b": [],
+            "tie_pct": [],
+            "concordant_pairs": [],
+            "discordant_pairs": [],
+        },
     }
 
     for perturbation, perturbation_by_seed in criterion_scores.items():
@@ -119,9 +131,46 @@ def collect_grouped_kendalls(
             tau = float(result.statistic)
             if tau != tau:
                 continue
-            grouped_kendalls[group_name].append(tau)
+            pair_counts = count_pair_relationships(baseline_values, perturbation_values)
+            grouped_metrics[group_name]["tau_b"].append(tau)
+            grouped_metrics[group_name]["tie_pct"].append(pair_counts["tie_pct"])
+            grouped_metrics[group_name]["concordant_pairs"].append(pair_counts["concordant_pairs"])
+            grouped_metrics[group_name]["discordant_pairs"].append(pair_counts["discordant_pairs"])
 
-    return grouped_kendalls
+    return grouped_metrics
+
+
+def count_pair_relationships(
+    baseline_values: list[float],
+    perturbation_values: list[float],
+) -> dict[str, float | None]:
+    total_pairs = len(baseline_values) * (len(baseline_values) - 1) // 2
+    concordant = 0
+    discordant = 0
+    tied_pairs = 0
+
+    for left_index, right_index in combinations(range(len(baseline_values)), 2):
+        baseline_delta = baseline_values[left_index] - baseline_values[right_index]
+        perturbation_delta = perturbation_values[left_index] - perturbation_values[right_index]
+
+        if baseline_delta == 0 or perturbation_delta == 0:
+            tied_pairs += 1
+            continue
+
+        if baseline_delta * perturbation_delta > 0:
+            concordant += 1
+        elif baseline_delta * perturbation_delta < 0:
+            discordant += 1
+
+    tie_pct = 0.0
+    if total_pairs > 0:
+        tie_pct = 100 * tied_pairs / total_pairs
+
+    return {
+        "concordant_pairs": float(concordant),
+        "discordant_pairs": float(discordant),
+        "tie_pct": tie_pct,
+    }
 
 
 def empty_group_comparison() -> dict[str, list[float]]:
