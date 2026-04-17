@@ -9,9 +9,11 @@ from typing import Any
 class AdapterInput:
     judge_model: str
     paraphrase_model: str
-    openrouter_api_key: str
     dataset_path: Path
     rubric_path: Path
+    openrouter_api_key: str | None = None
+    openai_api_key: str | None = None
+    anthropic_api_key: str | None = None
     dataset_id_column: str = "id"
     dataset_context_column: str = "context"
     dataset_candidate_column: str = "candidate"

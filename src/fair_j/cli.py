@@ -15,6 +15,7 @@ from fair_j.io_utils import (
 from fair_j.perturbations import make_variants
 from fair_j.report_html import render_comparison_report
 from fair_j.run_judge import run_judge
+from fair_j.model_clients import infer_model_provider
 from fair_j.schemas import AdapterInput
 
 
@@ -25,7 +26,9 @@ def build_parser() -> argparse.ArgumentParser:
     make_variants_parser = subparsers.add_parser("make-variants")
     make_variants_parser.add_argument("--rubric-path", type=Path, required=True)
     make_variants_parser.add_argument("--paraphrase-model", required=True)
-    make_variants_parser.add_argument("--openrouter-api-key", required=True)
+    make_variants_parser.add_argument("--openrouter-api-key")
+    make_variants_parser.add_argument("--openai-api-key")
+    make_variants_parser.add_argument("--anthropic-api-key")
     make_variants_parser.add_argument("--output-path", type=Path, required=True)
     make_variants_parser.set_defaults(func=cmd_make_variants)
 
@@ -64,7 +67,9 @@ def build_parser() -> argparse.ArgumentParser:
 def add_pipeline_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--judge-model", required=True)
     parser.add_argument("--paraphrase-model", required=True)
-    parser.add_argument("--openrouter-api-key", required=True)
+    parser.add_argument("--openrouter-api-key")
+    parser.add_argument("--openai-api-key")
+    parser.add_argument("--anthropic-api-key")
     parser.add_argument("--dataset-path", type=Path, required=True)
     parser.add_argument("--rubric-path", type=Path, required=True)
     parser.add_argument("--id-column", default="id")
@@ -81,11 +86,20 @@ def add_pipeline_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def cmd_make_variants(args: argparse.Namespace) -> None:
+    validate_required_api_keys(
+        judge_model=None,
+        paraphrase_model=args.paraphrase_model,
+        openrouter_api_key=args.openrouter_api_key,
+        openai_api_key=args.openai_api_key,
+        anthropic_api_key=args.anthropic_api_key,
+    )
     rubric = load_rubric(args.rubric_path)
     variants = make_variants(
         rubric=rubric,
         paraphrase_model=args.paraphrase_model,
         openrouter_api_key=args.openrouter_api_key,
+        openai_api_key=args.openai_api_key,
+        anthropic_api_key=args.anthropic_api_key,
     )
     write_json(args.output_path, variants)
     print(f"Wrote {len(variants)} variants to {args.output_path}")
@@ -160,10 +174,20 @@ def run_adapter_from_args(args: argparse.Namespace) -> dict[str, int | str]:
     if args.workers < 1:
         raise SystemExit("--workers must be at least 1.")
 
+    validate_required_api_keys(
+        judge_model=args.judge_model,
+        paraphrase_model=args.paraphrase_model,
+        openrouter_api_key=args.openrouter_api_key,
+        openai_api_key=args.openai_api_key,
+        anthropic_api_key=args.anthropic_api_key,
+    )
+
     adapter_input = AdapterInput(
         judge_model=args.judge_model,
         paraphrase_model=args.paraphrase_model,
         openrouter_api_key=args.openrouter_api_key,
+        openai_api_key=args.openai_api_key,
+        anthropic_api_key=args.anthropic_api_key,
         dataset_path=args.dataset_path,
         rubric_path=args.rubric_path,
         dataset_id_column=args.id_column,
@@ -199,3 +223,48 @@ def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
     args.func(args)
+
+
+def validate_required_api_keys(
+    *,
+    judge_model: str | None,
+    paraphrase_model: str | None,
+    openrouter_api_key: str | None,
+    openai_api_key: str | None,
+    anthropic_api_key: str | None,
+) -> None:
+    required: list[tuple[str, str, str | None]] = []
+    for role, model_name in (
+        ("judge model", judge_model),
+        ("paraphrase model", paraphrase_model),
+    ):
+        if not model_name:
+            continue
+        provider = infer_model_provider(model_name)
+        if provider == "openai":
+            required.append((role, model_name, openai_api_key))
+        elif provider == "anthropic":
+            required.append((role, model_name, anthropic_api_key))
+        else:
+            required.append((role, model_name, openrouter_api_key))
+
+    missing_messages: list[str] = []
+    for role, model_name, api_key in required:
+        if api_key:
+            continue
+        provider = infer_model_provider(model_name)
+        if provider == "openai":
+            missing_messages.append(
+                f"{role} '{model_name}' requires --openai-api-key because it uses the 'openai/' prefix."
+            )
+        elif provider == "anthropic":
+            missing_messages.append(
+                f"{role} '{model_name}' requires --anthropic-api-key because it uses the 'anthropic/' prefix."
+            )
+        else:
+            missing_messages.append(
+                f"{role} '{model_name}' requires --openrouter-api-key because it uses the OpenRouter route."
+            )
+
+    if missing_messages:
+        raise SystemExit("Missing required API key(s):\n- " + "\n- ".join(missing_messages))

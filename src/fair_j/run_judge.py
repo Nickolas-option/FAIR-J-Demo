@@ -15,7 +15,7 @@ from fair_j.io_utils import (
     read_jsonl,
     write_json,
 )
-from fair_j.openrouter_judge import build_judge_client, call_openrouter_judge
+from fair_j.openrouter_judge import call_openrouter_judge
 from fair_j.perturbations import make_variants
 from fair_j.schemas import (
     AdapterInput,
@@ -75,6 +75,8 @@ def run_judge(
             rubric=rubric,
             paraphrase_model=adapter_input.paraphrase_model,
             openrouter_api_key=adapter_input.openrouter_api_key,
+            openai_api_key=adapter_input.openai_api_key,
+            anthropic_api_key=adapter_input.anthropic_api_key,
         )
         write_json(variants_path, variants)
 
@@ -170,7 +172,6 @@ def get_pending_call_scores(
 ) -> tuple[dict[str, int | float], str]:
     expected_ids = {criterion.id for criterion in pending_call.variant.criteria}
     return call_openrouter_judge(
-        judge_client=build_judge_client(adapter_input),
         adapter_input=adapter_input,
         judge_model=adapter_input.judge_model,
         expected_ids=expected_ids,

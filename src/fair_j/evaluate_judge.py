@@ -31,12 +31,13 @@ from fair_j.stats_utils import (
 
 def evaluate_judge(run_dir: Path) -> CoreOutput:
     run_metadata, score_rows = read_run_artifacts(run_dir)
+    analysis_score_rows = score_rows + build_total_score_rows(score_rows)
     score_scale_span = compute_score_scale_span(run_metadata.scale_min, run_metadata.scale_max)
     output = CoreOutput(
         run_metadata=run_metadata,
-        dataset_level_scores=compute_dataset_level_scores(score_rows, score_scale_span),
-        ranking_consistency=compute_ranking_consistency(score_rows),
-        per_example_seed_std=compute_per_example_seed_std(score_rows, score_scale_span),
+        dataset_level_scores=compute_dataset_level_scores(analysis_score_rows, score_scale_span),
+        ranking_consistency=compute_ranking_consistency(analysis_score_rows),
+        per_example_seed_std=compute_per_example_seed_std(analysis_score_rows, score_scale_span),
     )
     write_json(run_dir / "core_output.json", output)
     return output
@@ -131,10 +132,14 @@ def compute_ranking_consistency(score_rows: list[ScoreLogRow]) -> dict[str, obje
             "kendall_paraphrases_std": raw_std(paraphrases.get("tau_b", [])),
             "kendall_paraphrases_min": min_or_none(paraphrases.get("tau_b", [])),
             "kendall_paraphrases_max": max_or_none(paraphrases.get("tau_b", [])),
+            "concordant_paraphrases_pooled": pooled_pair_count(paraphrases, "concordant_pairs"),
+            "discordant_paraphrases_pooled": pooled_pair_count(paraphrases, "discordant_pairs"),
             "kendall_deletions_mean": mean_or_none(deletions.get("tau_b", [])),
             "kendall_deletions_std": raw_std(deletions.get("tau_b", [])),
             "kendall_deletions_min": min_or_none(deletions.get("tau_b", [])),
             "kendall_deletions_max": max_or_none(deletions.get("tau_b", [])),
+            "concordant_deletions_pooled": pooled_pair_count(deletions, "concordant_pairs"),
+            "discordant_deletions_pooled": pooled_pair_count(deletions, "discordant_pairs"),
             "gamma_paraphrases_pooled": compute_pooled_gamma(
                 paraphrases.get("concordant_pairs", []),
                 paraphrases.get("discordant_pairs", []),
@@ -166,6 +171,34 @@ def compute_pooled_gamma(
     if total_comparable == 0:
         return None
     return (total_concordant - total_discordant) / total_comparable
+
+
+def pooled_pair_count(rank_metrics: dict[str, list[float]], key: str) -> int:
+    return int(round(sum(rank_metrics.get(key, []))))
+
+
+def build_total_score_rows(score_rows: list[ScoreLogRow]) -> list[ScoreLogRow]:
+    grouped_totals: dict[tuple[str, str, int, str], float] = {}
+    grouped_call_ids: dict[tuple[str, str, int, str], str] = {}
+
+    for row in score_rows:
+        key = (row.example_id, row.perturbation, row.seed, row.call_id)
+        grouped_totals[key] = grouped_totals.get(key, 0.0) + float(row.score)
+        grouped_call_ids[key] = row.call_id
+
+    total_rows: list[ScoreLogRow] = []
+    for (example_id, perturbation, seed, call_id), total_score in grouped_totals.items():
+        total_rows.append(
+            ScoreLogRow(
+                call_id=grouped_call_ids[(example_id, perturbation, seed, call_id)],
+                example_id=example_id,
+                criterion_id="__total__",
+                perturbation=perturbation,
+                seed=seed,
+                score=int(round(total_score)),
+            )
+        )
+    return total_rows
 
 
 def compute_per_example_seed_std(

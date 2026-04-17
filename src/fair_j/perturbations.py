@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from anthropic import Anthropic
 from openai import OpenAI
 
+from fair_j.model_clients import build_paraphrase_client, completion_text, infer_model_provider
 from fair_j.schemas import Criterion, Rubric, RubricVariant
 
 
@@ -13,6 +15,8 @@ def make_variants(
     rubric: Rubric,
     paraphrase_model: str,
     openrouter_api_key: str,
+    openai_api_key: str | None = None,
+    anthropic_api_key: str | None = None,
 ) -> list[RubricVariant]:
     variants = [build_baseline_variant(rubric)]
     variants.extend(
@@ -20,6 +24,8 @@ def make_variants(
             rubric=rubric,
             paraphrase_model=paraphrase_model,
             openrouter_api_key=openrouter_api_key,
+            openai_api_key=openai_api_key,
+            anthropic_api_key=anthropic_api_key,
         )
     )
     variants.extend(make_delete_variants(rubric))
@@ -38,6 +44,8 @@ def make_paraphrase_variants(
     rubric: Rubric,
     paraphrase_model: str,
     openrouter_api_key: str,
+    openai_api_key: str | None = None,
+    anthropic_api_key: str | None = None,
 ) -> list[RubricVariant]:
     variants: list[RubricVariant] = []
     for index, criterion in enumerate(rubric.criteria, start=1):
@@ -48,6 +56,8 @@ def make_paraphrase_variants(
             criterion_id=criterion.id,
             paraphrase_model=paraphrase_model,
             openrouter_api_key=openrouter_api_key,
+            openai_api_key=openai_api_key,
+            anthropic_api_key=anthropic_api_key,
         )
         variants.append(
             RubricVariant(
@@ -65,13 +75,16 @@ def paraphrase_criterion_text(
     criterion_id: str,
     paraphrase_model: str,
     openrouter_api_key: str,
+    openai_api_key: str | None = None,
+    anthropic_api_key: str | None = None,
 ) -> str:
-    client = OpenAI(
-        api_key=openrouter_api_key,
-        base_url="https://openrouter.ai/api/v1",
-        timeout=PARAPHRASE_REQUEST_TIMEOUT_SECONDS,
-        max_retries=0,
-    )
+    provider = infer_model_provider(paraphrase_model)
+    if provider == "openai":
+        if not openai_api_key:
+            raise ValueError("openai_api_key is required for OpenAI models.")
+    elif provider == "anthropic":
+        if not anthropic_api_key:
+            raise ValueError("anthropic_api_key is required for Anthropic models.")
     prompt = build_paraphrase_prompt(
         rubric_name=rubric_name,
         criterion_id=criterion_id,
@@ -82,12 +95,13 @@ def paraphrase_criterion_text(
     for _ in range(PARAPHRASE_MAX_RETRIES):
         try:
             completion = create_paraphrase_completion(
-                client=client,
+                openrouter_api_key=openrouter_api_key,
+                openai_api_key=openai_api_key,
+                anthropic_api_key=anthropic_api_key,
                 paraphrase_model=paraphrase_model,
                 prompt=prompt,
             )
-            content = completion.choices[0].message.content
-            paraphrase = normalize_paraphrase_output(content)
+            paraphrase = normalize_paraphrase_output(completion_text(completion))
             if paraphrase and paraphrase != criterion_text:
                 return paraphrase
             if paraphrase:
@@ -103,12 +117,40 @@ def paraphrase_criterion_text(
 
 
 def create_paraphrase_completion(
-    client: OpenAI,
+    openrouter_api_key: str,
+    openai_api_key: str | None,
+    anthropic_api_key: str | None,
     paraphrase_model: str,
     prompt: str,
 ):
+    provider = infer_model_provider(paraphrase_model)
+    if provider == "anthropic":
+        client = Anthropic(
+            api_key=anthropic_api_key,
+            timeout=PARAPHRASE_REQUEST_TIMEOUT_SECONDS,
+        )
+        return client.messages.create(
+            model=paraphrase_model.removeprefix("anthropic/"),
+            max_tokens=1024,
+            temperature=0,
+            system=(
+                "You rewrite evaluation rubric criteria. "
+                "Return exactly one paraphrased criterion sentence. "
+                "Preserve meaning, scale, and constraints. "
+                "Do not add explanations, bullet points, or quotes."
+            ),
+            messages=[{"role": "user", "content": prompt}],
+        )
+
+    client = build_paraphrase_client(
+        paraphrase_model,
+        openrouter_api_key=openrouter_api_key,
+        openai_api_key=openai_api_key,
+        anthropic_api_key=anthropic_api_key,
+        timeout_seconds=PARAPHRASE_REQUEST_TIMEOUT_SECONDS,
+    )
     kwargs = {
-        "model": paraphrase_model,
+        "model": paraphrase_model.removeprefix("openai/") if provider == "openai" else paraphrase_model,
         "temperature": 0,
         "messages": [
             {
@@ -124,9 +166,12 @@ def create_paraphrase_completion(
         ],
     }
 
+    extra_body = None if provider == "openai" else build_paraphrase_extra_body(paraphrase_model)
     try:
+        if extra_body is None:
+            return client.chat.completions.create(**kwargs)
         return client.chat.completions.create(
-            extra_body=build_paraphrase_extra_body(paraphrase_model),
+            extra_body=extra_body,
             **kwargs,
         )
     except Exception as error:
