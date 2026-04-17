@@ -4,18 +4,74 @@ Minimal `V1` skeleton for a research tool that checks the reliability of `LLM-as
 
 ## Quick Start With Your Own Data
 
+1. Install dependencies:
+
 ```bash
 uv sync
-export OPENROUTER_API_KEY=your_key_here
+```
 
-# 1) Create a dataset file, for example my_dataset.jsonl
-cat > my_dataset.jsonl <<'EOF'
+2. Set the API keys you need:
+
+```bash
+export OPENROUTER_API_KEY=your_openrouter_key
+
+# Optional: only needed when the selected model uses the `openai/` prefix.
+# export OPENAI_API_KEY=your_openai_key
+
+# Optional: only needed when the selected model uses the `anthropic/` prefix.
+# export ANTHROPIC_API_KEY=your_anthropic_key
+```
+
+3. Prepare a dataset file and a rubric file.
+
+Supported dataset formats:
+
+- `jsonl`
+- `csv`
+- `parquet`
+- `json` (array of objects)
+
+Default dataset columns:
+
+- `id`
+- `context`
+- `candidate`
+
+Example dataset as `JSONL`:
+
+```json
 {"id":"ex_001","context":"Source text for example 1.","candidate":"Model output for example 1."}
 {"id":"ex_002","context":"Source text for example 2.","candidate":"Model output for example 2."}
-EOF
+```
 
-# 2) Create a rubric file, for example my_rubric.json
-cat > my_rubric.json <<'EOF'
+Example dataset as `JSON`:
+
+```json
+[
+  {
+    "id": "ex_001",
+    "context": "Source text for example 1.",
+    "candidate": "Model output for example 1."
+  },
+  {
+    "id": "ex_002",
+    "context": "Source text for example 2.",
+    "candidate": "Model output for example 2."
+  }
+]
+```
+
+Example dataset as `CSV`:
+
+```csv
+id,context,candidate
+ex_001,"Source text for example 1.","Model output for example 1."
+ex_002,"Source text for example 2.","Model output for example 2."
+```
+
+Example rubric as `JSON`:
+
+```json
 {
   "name": "my_rubric",
   "scale": { "min": 1, "max": 5 },
@@ -24,32 +80,88 @@ cat > my_rubric.json <<'EOF'
     { "id": "relevance", "text": "The answer should focus on the important information." }
   ]
 }
-EOF
+```
 
-# 3) Run the full pipeline
+4. Run the full pipeline.
+
+Required arguments only:
+
+```bash
+uv run fair-j run-pipeline \
+  --judge-model qwen/qwen3-8b \
+  --paraphrase-model qwen/qwen3-8b \
+  --openrouter-api-key "$OPENROUTER_API_KEY" \
+  --dataset-path my_dataset.jsonl \
+  --rubric-path my_rubric.json
+```
+
+Optional arguments:
+
+```bash
 uv run fair-j run-pipeline \
   --judge-model qwen/qwen3-8b \
   --paraphrase-model qwen/qwen3-8b \
   --openrouter-api-key "$OPENROUTER_API_KEY" \
   --dataset-path my_dataset.jsonl \
   --rubric-path my_rubric.json \
-  --subset-name my_first_run \
-  --workers 1
+  \
+  # Optional: only for `openai/...` judge or paraphrase models.
+  # --openai-api-key "$OPENAI_API_KEY" \
+  \
+  # Optional: only for `anthropic/...` judge or paraphrase models.
+  # --anthropic-api-key "$ANTHROPIC_API_KEY" \
+  \
+  # Optional: defaults to dataset_path.stem
+  # --subset-name my_first_run \
+  \
+  # Optional: defaults to auto-generated path inside runs/
+  # --run-dir runs/my_first_run \
+  \
+  # Optional: defaults to 1
+  # --seeds 3 \
+  \
+  # Optional: defaults to 25
+  # --workers 1 \
+  \
+  # Optional: defaults to 90.0
+  # --request-timeout 120 \
+  \
+  # Optional: only if your dataset uses custom column names
+  # --id-column example_id \
+  # --context-column source_text \
+  # --candidate-column summary_text \
+  \
+  # Optional: OpenRouter provider controls
+  # --provider deepinfra \
+  # --provider-quantization fp8 \
+  \
+  # Optional: render report to a custom file instead of run_dir/report.html
+  # --html-output-path runs/my_report.html \
+  \
+  # Optional: custom HTML page title
+  # --html-title "My FAIR-J Report" \
+  \
+  # Optional: disable adapter progress bar
+  # --no-progress
 ```
 
 This creates a new run in `runs/` and writes the HTML summary to `report.html` inside that run directory.
 
 API keys:
 
-- This repo currently sends model calls through OpenRouter.
-- In practice, that means you should set `OPENROUTER_API_KEY`.
-- Even if you want to use an OpenAI model or an Anthropic model, you still pass it through OpenRouter in this repo.
-- `OPENAI_API_KEY` and `ANTHROPIC_API_KEY` are not used directly by the current CLI.
+- OpenRouter-routed models use `OPENROUTER_API_KEY`.
+- Models with the `openai/` prefix use `OPENAI_API_KEY`.
+- Models with the `anthropic/` prefix use `ANTHROPIC_API_KEY`.
+- You only need to provide the keys required by the models you actually chose.
 
 Example:
 
 ```bash
 export OPENROUTER_API_KEY=your_openrouter_key
+
+# Optional, if needed by your model choice:
+# export OPENAI_API_KEY=your_openai_key
+# export ANTHROPIC_API_KEY=your_anthropic_key
 ```
 
 How to write model names:
@@ -66,7 +178,8 @@ Example:
 uv run fair-j run-pipeline \
   --judge-model openai/gpt-4.1-mini \
   --paraphrase-model anthropic/claude-3.5-sonnet \
-  --openrouter-api-key "$OPENROUTER_API_KEY" \
+  --openai-api-key "$OPENAI_API_KEY" \
+  --anthropic-api-key "$ANTHROPIC_API_KEY" \
   --dataset-path my_dataset.jsonl \
   --rubric-path my_rubric.json
 ```
