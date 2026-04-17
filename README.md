@@ -37,6 +37,22 @@ Default dataset columns:
 - `context`
 - `candidate`
 
+Datasets may contain additional columns. `fair-j` only requires these three mapped fields and keeps any extra non-empty columns as example metadata.
+
+If your dataset uses different column names, pass them explicitly in the CLI:
+
+```bash
+uv run fair-j run-pipeline \
+  --judge-model qwen/qwen3-8b \
+  --paraphrase-model qwen/qwen3-8b \
+  --openrouter-api-key "$OPENROUTER_API_KEY" \
+  --dataset-path my_dataset.csv \
+  --rubric-path my_rubric.json \
+  --id-column example_id \
+  --context-column source_text \
+  --candidate-column summary_text
+```
+
 Example dataset as `JSONL`:
 
 ```json
@@ -68,6 +84,8 @@ id,context,candidate
 ex_001,"Source text for example 1.","Model output for example 1."
 ex_002,"Source text for example 2.","Model output for example 2."
 ```
+
+You can also pass a `parquet` dataset file as `--dataset-path my_dataset.parquet` as long as it contains the same mapped fields.
 
 Example rubric as `JSON`:
 
@@ -196,20 +214,6 @@ Supported dataset formats:
 - `csv`
 - `parquet`
 - `json` (array of objects)
-
-If your dataset uses different column names, pass them explicitly:
-
-```bash
-uv run fair-j run-pipeline \
-  --judge-model qwen/qwen3-8b \
-  --paraphrase-model qwen/qwen3-8b \
-  --openrouter-api-key "$OPENROUTER_API_KEY" \
-  --dataset-path my_dataset.csv \
-  --rubric-path my_rubric.json \
-  --id-column example_id \
-  --context-column source_text \
-  --candidate-column summary_text
-```
 
 ## Commands
 
