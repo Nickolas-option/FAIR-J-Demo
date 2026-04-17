@@ -1,373 +1,101 @@
-## `AdapterInput`
+# FAIR-J Architecture
 
-`AdapterInput` is the minimal input contract for any task-specific adapter in `FAIR-J`.
+## Table Of Contents
 
-The adapter does not read benchmark-specific formats directly. Instead, it takes:
-- OpenRouter model identifiers,
-- an OpenRouter API key,
-- a path to a judge-ready dataset file,
-- and a path to a rubric/checklist file.
+- [Overview](#overview)
+- [Repository Map](#repository-map)
+- [Phase 1: Run The Judge](#phase-1-run-the-judge)
+- [Phase 2: Evaluate The Judge](#phase-2-evaluate-the-judge)
+- [Run Artifacts](#run-artifacts)
 
-This keeps the adapter simple and makes the tool reusable across different tasks.
+## Overview
 
-### Fields
+`FAIR-J` is organized around two phases:
 
-- `judge_model: str`  
-  OpenRouter model name used as the judge.
+1. `Run the judge`: build rubric perturbations, call the judge model, validate the structured outputs, and write run artifacts.
+2. `Evaluate the judge`: read completed run artifacts, compute robustness metrics, and render human-readable reports.
 
-- `paraphrase_model: str`  
-  OpenRouter model name used to generate rubric paraphrases.
+This split keeps the execution path simple and resumable, while keeping the analysis path deterministic and easy to iterate on.
 
-- `openrouter_api_key: str`  
-  API key used for OpenRouter requests.
+At a high level:
 
-- `dataset_path: Path`  
-  Path to a judge-ready dataset file in `JSONL` format.
+- `AdapterInput`, `DatasetExample`, `Rubric`, and `RubricVariant` define the inputs needed to execute judge calls.
+- `RunMetadata`, `CallLogRow`, and `ScoreLogRow` define the artifacts produced by a run.
+- `CoreOutput` defines the final evaluation payload consumed by reporting.
 
-- `rubric_path: Path`  
-  Path to a rubric/checklist file in `JSON` format.
+## Repository Map
 
-### Expected format for `dataset_path`
+- `src/` - installable project source tree.
+- `src/fair_j/` - package code for the CLI, judge execution, evaluation, stats, and HTML reporting.
+- `data/` - tiny committed fixture data for first-run testing only.
+- `examples/` - runnable example assets, including a shell script and an alternate CSV input example.
+- `runs/` - generated outputs; the repo keeps only an example HTML report, while full run artifacts stay out of git.
+- `summeval_conversion/` - legacy benchmark-specific conversion helper for SummEval raw data.
+- `README.md` - quick-start usage and CLI entry points.
+- `ARCHITECTURE.md` - high-level technical map of the repository.
+- `limitations.md` - explicit current boundaries and known gaps in the project.
 
-`dataset_path` must point to a `JSONL` file.
+## Phase 1: Run The Judge
 
-Each line must contain one evaluation example with the following minimal fields:
+The first phase turns a dataset plus rubric into validated judge scores.
 
-- `id: str`
-- `context: str`
-- `candidate: str`
+Main modules:
 
-Optional field:
+- `cli.py` - exposes `run-pipeline`, `run-adapter`, `make-variants`, `run-core`, and report rendering commands.
+- `run_judge.py` - orchestrates one run: load inputs, create variants, call the judge, resume safely, and write logs.
+- `openrouter_judge.py` - configures the OpenRouter client, enforces structured outputs, and validates returned scores.
+- `perturbations.py` - generates baseline, paraphrase, and deletion rubric variants.
+- `io_utils.py` - loads datasets and rubrics, manages run directories, and reads/writes JSON and JSONL artifacts.
+- `schemas.py` - defines the typed contracts used across the run pipeline.
 
-- `metadata: object`
+Key data structures:
 
-`metadata` may contain any additional task-specific fields.
+- `AdapterInput` - minimal execution config for judge runs.
+- `DatasetExample` - one example to be judged.
+- `Rubric` - baseline rubric definition.
+- `RubricVariant` - one perturbed rubric variant.
+- `RunMetadata` - run-level config stored once per run.
+- `CallLogRow` - exact prompt/output record for one model call.
+- `ScoreLogRow` - validated atomic score record for one criterion.
 
-#### Minimal JSONL example row
+Why this phase exists:
 
-```json
-{"id":"example_001","context":"Input or source content to evaluate against.","candidate":"Model output being judged.","metadata":{"source_id":"doc_17","model_id":"candidate_a"}}
-```
+- It isolates all networked and non-deterministic work.
+- It makes resume possible from `score_log.jsonl`.
+- It keeps benchmark-specific preprocessing outside the core package.
 
-### Expected format for `rubric_path`
+## Phase 2: Evaluate The Judge
 
-`rubric_path` must point to a checklist `JSON` file with the following structure:
+The second phase reads finished run artifacts and converts them into robustness metrics and reports.
 
-- `name: str`
-- `scale`
-  - `min: int | float`
-  - `max: int | float`
-- `criteria: list[object]`
-  - `id: str`
-  - `text: str`
+Main modules:
 
-#### Minimal checklist JSON example
+- `evaluate_judge.py` - entry point for deterministic post-processing of completed runs.
+- `score_grouping.py` - groups baseline and perturbation scores into comparison-ready structures.
+- `stats_utils.py` - computes variability, paired tests, effect sizes, and ranking diagnostics.
+- `report_html.py` - renders single-run and multi-run HTML summaries from analysis outputs.
 
-```json
-{
-  "name": "rubric_v1",
-  "scale": {
-    "min": 1,
-    "max": 5
-  },
-  "criteria": [
-    {
-      "id": "criterion_1",
-      "text": "Criterion description."
-    }
-  ]
-}
-```
+Key data structures:
 
-## `Run-level metadata`
+- `CoreOutput` - top-level evaluation result written to `core_output.json`.
 
-Run-level metadata stores values that are constant for the whole run and therefore should not be duplicated in every raw row.
+Why this phase exists:
 
-- `judge_model: str`  
-  Lives on run-level because one run uses one judge model.
+- It keeps evaluation reproducible once the raw scores are written.
+- It allows report iteration without re-running judge calls.
+- It separates metric definitions from provider-specific execution details.
 
-- `paraphrase_model: str`  
-  Lives on run-level because one run uses one paraphrase model.
+## Run Artifacts
 
-- `dataset_path: Path`  
-  Lives on run-level because all raw rows come from the same dataset file.
+Each run lives in its own directory under `runs/` during local work.
 
-- `rubric_path: Path`  
-  Lives on run-level because all raw rows use the same rubric file.
+Important files:
 
-- `subset_name: str`  
-  Lives on run-level because all raw rows belong to the same subset.
-  In `V1`, `subset_name` is optional at the CLI level.
-  If it is not provided, the default is `dataset_path.stem`.
+- `run.json` - run-level metadata such as models, dataset path, rubric path, and score scale.
+- `variants.json` - generated rubric variants used in the run.
+- `call_log.jsonl` - raw prompt/output audit log for each judge call.
+- `score_log.jsonl` - validated score rows; this is the main source of truth for evaluation.
+- `core_output.json` - computed metrics derived from `score_log.jsonl`.
+- `report.html` - optional single-run human-readable HTML summary.
 
-- `scale_min: int | float`  
-  Lives on run-level because the lower bound of the score scale is fixed for the run.
-
-- `scale_max: int | float`  
-  Lives on run-level because the upper bound of the score scale is fixed for the run.
-
-### Minimal run-level metadata example
-
-```json
-{
-  "judge_model": "openai/gpt-4.1-mini",
-  "paraphrase_model": "qwen/qwen2.5-7b-instruct",
-  "dataset_path": "data/examples.jsonl",
-  "rubric_path": "data/rubric.json",
-  "subset_name": "subset_001",
-  "scale_min": 1,
-  "scale_max": 5
-}
-```
-
-## `Run folder layout`
-
-One run is stored in one dedicated run folder.
-
-Inside that folder, `V1` uses fixed, explicit file names:
-
-- `run.json`
-- `variants.json`
-- `call_log.jsonl`
-- `score_log.jsonl`
-- `core_output.json`
-
-### Why these files exist
-
-- `run.json` stores run-level metadata.
-- `variants.json` stores the generated perturbation variants and is required.
-- `call_log.jsonl` stores raw calls for reproducibility and debugging.
-- `score_log.jsonl` stores validated score rows and is the source of truth for metrics.
-- `core_output.json` stores the analysis results produced by `core`.
-
-### Resume rule
-
-Resume must rely on `score_log.jsonl`.
-
-A call is considered completed only if it has already produced valid score rows in `score_log.jsonl`.
-
-If `--run-dir` is not provided, `V1` should auto-create:
-
-`runs/<timestamp>__<judge_model_slug>__<subset_name>__<scale_min>-<scale_max>`
-
-## `Call log`
-
-`Call log` is required.
-
-It is the source of truth for reproducibility and debugging. It stores the exact prompt sent to the model and the raw model output returned by the model.
-
-To support an exact linkage between logs, each call log entry must have a `call_id`.
-There is no bijection between individual rows of `call log` and `score log`.
-The relationship is `one call log row -> many score log rows`, and it is recovered through `call_id`.
-
-The adapter must use OpenRouter Structured Outputs (`response_format` + `json_schema`) together with `Instructor` and a typed schema. Parsing and validation are adapter responsibilities.
-
-### Retry policy
-
-The adapter should retry structured-output calls up to `10` times.
-
-If a call still cannot be validated after all retries, the run should fail.
-Because resume relies on `score_log.jsonl`, the run must still be resumable from the same point later.
-
-In `V1`, the requested number of `seed` repeats applies to all perturbations, not only to baseline.
-
-### Minimal call log example
-
-```json
-{
-  "call_id": "call_000001",
-  "example_id": "example_001",
-  "perturbation": "baseline",
-  "seed": 0,
-  "prompt_text": "Judge this candidate output using the rubric.",
-  "raw_model_output": "{\"criterion_1\": 4}"
-}
-```
-
-## `Score log`
-
-`Score log` stores validated atomic score observations and is the source of truth for metrics.
-
-- `call_id: str`
-- `example_id: str`
-- `criterion_id: str`
-- `perturbation: str`
-- `seed: int | str`
-- `score: int | float`
-- `metadata: object` (optional)
-
-### Notes
-
-- `call_id` links each score row to the exact call log entry it was parsed from.
-- The linkage is one-to-many: one call may produce multiple score rows.
-- There is no row-level bijection between `call log` and `score log`.
-- `seed` is the axis of repeated measurements under the same condition, even if it is not literally a controllable API seed.
-- `perturbation` stores a single string identifier such as:
-  - `baseline`
-  - `paraphrase__criterion_1__01`
-  - `delete__fluency`
-
-This keeps the score schema minimal. Perturbation type or group can be recovered later by parsing this field.
-Every score row points back to exactly one call log entry through `call_id`.
-
-For a minimal project, `call_id` should be assigned as a deterministic sequential identifier within the run, for example `call_000001`, `call_000002`, and so on.
-
-### Minimal score log example
-
-```json
-{
-  "call_id": "call_000001",
-  "example_id": "example_001",
-  "criterion_id": "criterion_1",
-  "perturbation": "baseline",
-  "seed": 0,
-  "score": 4,
-  "metadata": {
-    "provider": "openrouter"
-  }
-}
-```
-
-## `CoreInput`
-
-`CoreInput` is the minimal contract for the analysis layer in `FAIR-J`.
-
-The `core` reads:
-- run-level metadata
-- score log
-
-The score log is the main input for metrics.
-
-The call log is a required system artifact, but it is not the main input for metrics.
-`core` uses `run-level metadata + score log` for metrics.
-The call log is available for audit, debugging, and reproducibility.
-
-`core` does not analyze parsing quality. Structured output parsing and validation are completed by the adapter before score rows are written.
-
-Any tensor-like representation or pivoted table is optional and may be built internally only as a derived view for computation.
-
-### Required score log fields used by `core`
-
-- `call_id`
-- `example_id`
-- `criterion_id`
-- `perturbation`
-- `seed`
-- `score`
-
-### Baseline matching rule
-
-For a fixed run, `core` matches each non-baseline row to its baseline row(s) using the same:
-- `example_id`
-- `criterion_id`
-- `seed`
-
-where the baseline row is defined by:
-- `perturbation = "baseline"`
-
-For statistical tests, `core` builds paired differences on the same examples:
-
-`delta = baseline_score - perturbation_score`
-
-This matching is always done from the score log. Tensor-like or pivoted representations, if used, are only internal derived views built after this canonical linkage is defined.
-
-## `CoreOutput`
-
-`CoreOutput` is the minimal output contract for the analysis layer in `FAIR-J`.
-
-In `V1`, `CoreOutput` is `per_criterion` only.
-It does not include:
-- `sum_over_criteria`
-- `rank_difference_analysis`
-- summary / verdict layer
-
-The minimal output shape is:
-
-```json
-{
-  "run_metadata": {
-    "judge_model": "string",
-    "paraphrase_model": "string",
-    "dataset_path": "string",
-    "rubric_path": "string",
-    "subset_name": "string",
-    "scale_min": "number",
-    "scale_max": "number"
-  },
-  "dataset_level_scores": {
-    "criterion_id_1": {
-      "std_seed_default": "number",
-      "std_perturbations": "number",
-      "std_paraphrases": "number",
-      "std_deletions": "number",
-      "std_total": "number",
-      "bias_paraphrases": "number",
-      "mad_paraphrases": "number",
-      "bias_deletions": "number",
-      "mad_deletions": "number",
-      "stat_tests": {
-        "tested_quantity": "difference_vs_zero",
-        "alternative": "two_sided",
-        "n_pairs": "integer",
-        "tests": {
-          "paired_permutation_test": {
-            "p_value": "number"
-          },
-          "wilcoxon_signed_rank": {
-            "p_value": "number"
-          },
-          "paired_t_test": {
-            "p_value": "number"
-          }
-        }
-      }
-    }
-  },
-  "ranking_consistency": {
-    "criterion_id_1": {
-      "kendall_paraphrases_mean": "number",
-      "kendall_paraphrases_std": "number",
-      "kendall_paraphrases_min": "number",
-      "kendall_paraphrases_max": "number",
-      "kendall_deletions_mean": "number",
-      "kendall_deletions_std": "number",
-      "kendall_deletions_min": "number",
-      "kendall_deletions_max": "number"
-    }
-  }
-}
-```
-
-### `dataset_level_scores`
-
-This block stores dataset-level stability metrics for each criterion.
-
-It contains:
-- standard deviations across seeds and perturbations
-- group-level standard deviations for paraphrases and deletions
-- `bias` and `MAD`
-- a dedicated `stat_tests` sub-block
-
-By default, uncertainty estimates based on dataset-level `std_*` metrics should be normalized by `sqrt(n_examples - 1)`.
-If the real target dataset size is larger than the current subset, they may instead be normalized by `sqrt(n_dataset_size - 1)`.
-If `V1` does not yet implement dataset-size-aware normalization, that part should be treated as deferred.
-
-### `stat_tests`
-
-This block stores raw statistical test results for paired, two-sided tests of:
-
-`delta = baseline_score - perturbation_score`
-
-against zero on the same examples.
-
-It does not store a final significance verdict in `V1`.
-
-### `ranking_consistency`
-
-This block stores ranking stability metrics for each criterion using Kendall-based comparisons between baseline and perturbations.
-
-In `V1`, it stores only grouped paraphrase/deletion aggregates:
-- mean
-- std
-- min
-- max
+The repository intentionally does not commit full run directories. For demo purposes, we keep only an example comparison HTML file in `runs/` so a new reader can immediately see what the final output looks like.

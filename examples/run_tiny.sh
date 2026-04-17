@@ -7,7 +7,7 @@ fair-j run-pipeline \
   --judge-model qwen/qwen3-8b \
   --paraphrase-model qwen/qwen3-8b \
   --openrouter-api-key "$OPENROUTER_API_KEY" \
-  --dataset-path examples/tiny_dataset.jsonl \
-  --rubric-path examples/tiny_rubric.json \
+  --dataset-path data/tiny_dataset.jsonl \
+  --rubric-path data/tiny_rubric.json \
   --subset-name tiny_example \
   --workers 1

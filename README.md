@@ -70,4 +70,5 @@ fair-j render-compare-html \
 - `paraphrase_model` values use a real OpenRouter-backed paraphrase path.
 - Supported dataset formats: `jsonl`, `csv`, `parquet`.
 - Default dataset columns are `id`, `context`, `candidate`. Use `--id-column`, `--context-column`, and `--candidate-column` for custom schemas.
-- Runnable examples live in [examples/README.md](/Users/nik/Documents/Cursor%20Projects/Diploma/contextDPO/FAIR-J/examples/README.md).
+- Runnable examples live in [`examples/README.md`](examples/README.md).
+- The repo keeps only tiny fixture data in `data/` and one example HTML report in `runs/`.

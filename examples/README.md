@@ -4,10 +4,10 @@ This directory contains small runnable examples for `FAIR-J`.
 
 Included files:
 
-- `tiny_dataset.jsonl` — minimal judge-ready dataset in the default format
-- `tiny_dataset.csv` — the same tiny dataset in CSV format
-- `tiny_rubric.json` — a minimal 2-criterion rubric
 - `run_tiny.sh` — an end-to-end example command using the unified pipeline entry point
+- `tiny_dataset.csv` — the same tiny fixture as a CSV example for custom-schema or alternate-format testing
+
+The canonical tiny fixture now lives in `data/`.
 
 Default expected dataset columns:
 
@@ -30,7 +30,7 @@ fair-j run-pipeline \
   --paraphrase-model openrouter/paraphrase-model \
   --openrouter-api-key "$OPENROUTER_API_KEY" \
   --dataset-path path/to/data.parquet \
-  --rubric-path examples/tiny_rubric.json \
+  --rubric-path data/tiny_rubric.json \
   --id-column example_id \
   --context-column source_text \
   --candidate-column summary_text
