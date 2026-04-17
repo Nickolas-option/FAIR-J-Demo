@@ -1,6 +1,6 @@
 # FAIR-J
 
-Minimal `V1` skeleton for a research tool that checks the reliability of `LLM-as-a-Judge`.
+A research tool that checks the reliability of `LLM-as-a-Judge`.
 
 ## Quick Start With Your Own Data
 
