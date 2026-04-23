@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from math import sqrt
 
 import numpy as np
@@ -141,8 +142,13 @@ def paired_permutation_test(differences: list[float]) -> float | None:
 def wilcoxon_signed_rank_test(differences: list[float]) -> float | None:
     if len(differences) < 1:
         return None
+    values = np.asarray(differences, dtype=float)
+    if np.allclose(values, 0.0):
+        return 1.0
     try:
-        result = wilcoxon(differences, alternative="two-sided", zero_method="wilcox")
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            result = wilcoxon(values, alternative="two-sided", zero_method="wilcox")
     except ValueError:
         return None
     p_value = float(result.pvalue)
@@ -154,7 +160,15 @@ def wilcoxon_signed_rank_test(differences: list[float]) -> float | None:
 def paired_t_test(baseline: list[float], perturbation: list[float]) -> float | None:
     if len(baseline) < 2 or len(perturbation) < 2:
         return None
-    result = ttest_rel(baseline, perturbation, alternative="two-sided")
+    baseline_values = np.asarray(baseline, dtype=float)
+    perturbation_values = np.asarray(perturbation, dtype=float)
+    differences = baseline_values - perturbation_values
+    if np.allclose(differences, 0.0):
+        return 1.0
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        result = ttest_rel(baseline_values, perturbation_values, alternative="two-sided")
     p_value = float(result.pvalue)
     if p_value != p_value:
         return None
@@ -172,7 +186,12 @@ def normalized_std(values: list[float], n_examples: int) -> float | None:
 def raw_std(values: list[float]) -> float | None:
     if len(values) < 2:
         return None
-    return float(tstd(np.asarray(values, dtype=float)))
+    array = np.asarray(values, dtype=float)
+    if np.allclose(array, array[0]):
+        return 0.0
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        return float(tstd(array))
 
 
 def bias_to_mae_ratio(differences: list[float]) -> float | None:
