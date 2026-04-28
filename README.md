@@ -37,7 +37,15 @@ Default dataset columns:
 - `context`
 - `candidate`
 
+Column meanings:
+
+- `id` is a stable example identifier.
+- `context` is the information the judge needs in order to evaluate the output. Depending on the task, this can be the source document, user prompt, reference answer, translation source, dialogue history, or any other task-specific background.
+- `candidate` is the model generation being judged. For summarization, this is the summary. For translation, this is the translated text. For other tasks, this is the text or answer that should receive rubric scores.
+
 Datasets may contain additional columns. `fair-j` only requires these three mapped fields and keeps any extra non-empty columns as example metadata.
+
+Different LLM-as-a-judge tasks may need slightly different preprocessing. If your raw dataset has multiple turns, nested fields, or task-specific metadata, the simplest path is usually to write a small adapter that formats everything the judge should see into `context` and places the judged model output into `candidate`.
 
 If your dataset uses different column names, pass them explicitly in the CLI:
 
@@ -99,6 +107,28 @@ Example rubric as `JSON`:
   ]
 }
 ```
+
+The rubric file is a structured version of the judge prompt. `fair-j` uses the `scale` and `criteria` fields to build a prompt that asks the judge to score the `candidate` using every criterion, while taking the `context` into account.
+
+For example, the rubric above corresponds to a judge instruction roughly like:
+
+```text
+Evaluate the model generation using a 1-5 scale.
+
+Context:
+{context}
+
+Model generation to evaluate:
+{candidate}
+
+Criteria:
+- coherence: The answer should be easy to follow.
+- relevance: The answer should focus on the important information.
+
+Return one whole-number score for each criterion.
+```
+
+If you already have a rubric written as a free-form prompt, rewrite its scoring dimensions into the `criteria` list and put the numeric score range into `scale`.
 
 4. Run the full pipeline.
 
