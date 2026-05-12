@@ -85,7 +85,7 @@ def add_pipeline_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--run-dir", type=Path)
     parser.add_argument("--variants-path", type=Path)
     parser.add_argument("--seeds", type=int, default=1)
-    parser.add_argument("--paraphrases-per-criterion", type=int, default=1)
+    parser.add_argument("--paraphrases-per-criterion", type=int)
     parser.add_argument("--workers", type=int, default=25)
     parser.add_argument("--no-progress", action="store_true")
 
@@ -184,10 +184,11 @@ def run_adapter_from_args(args: argparse.Namespace) -> dict[str, int | str]:
     if args.workers < 1:
         raise SystemExit("--workers must be at least 1.")
     validate_positive_int_argument(value=args.seeds, argument_name="--seeds")
-    validate_positive_int_argument(
-        value=args.paraphrases_per_criterion,
-        argument_name="--paraphrases-per-criterion",
-    )
+    if args.paraphrases_per_criterion is not None:
+        validate_positive_int_argument(
+            value=args.paraphrases_per_criterion,
+            argument_name="--paraphrases-per-criterion",
+        )
     paraphrase_model_input = resolve_paraphrase_model_argument(args)
     paraphrase_model_for_keys = None if args.variants_path else paraphrase_model_input
 

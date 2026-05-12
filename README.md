@@ -174,7 +174,9 @@ uv run fair-j run-pipeline \
   # Optional: defaults to 1
   # --seeds 3 \
   \
-  # Optional: defaults to 1 (number of paraphrase variants generated per criterion)
+  # Optional: number of paraphrase variants generated per criterion when variants
+  # are generated inside this run. If --variants-path is provided and this flag is
+  # omitted, FAIR-J infers the value from variants.json automatically.
   # --paraphrases-per-criterion 5 \
   \
   # Optional: defaults to 25

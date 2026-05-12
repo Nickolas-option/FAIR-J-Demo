@@ -4,6 +4,7 @@ import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
+import re
 from typing import Callable
 
 from fair_j.io_utils import (
@@ -41,11 +42,14 @@ def run_judge(
     run_dir: Path,
     subset_name: str,
     seeds: int,
-    paraphrases_per_criterion: int = 1,
+    paraphrases_per_criterion: int | None = None,
     variants_path: Path | None = None,
     workers: int = 10,
     progress_callback: Callable[[int, int], None] | None = None,
 ) -> dict[str, int | str]:
+    if paraphrases_per_criterion is not None and paraphrases_per_criterion < 1:
+        raise SystemExit("--paraphrases-per-criterion must be at least 1.")
+
     dataset = load_dataset_examples(
         adapter_input.dataset_path,
         id_column=adapter_input.dataset_id_column,
@@ -53,22 +57,6 @@ def run_judge(
         candidate_column=adapter_input.dataset_candidate_column,
     )
     rubric = load_rubric(adapter_input.rubric_path)
-    run_metadata = RunMetadata(
-        judge_model=adapter_input.judge_model,
-        paraphrase_model=adapter_input.paraphrase_model,
-        dataset_path=str(adapter_input.dataset_path),
-        rubric_path=str(adapter_input.rubric_path),
-        subset_name=subset_name,
-        scale_min=rubric.scale_min,
-        scale_max=rubric.scale_max,
-        paraphrases_per_criterion=paraphrases_per_criterion,
-        dataset_format=infer_dataset_format(adapter_input.dataset_path),
-        dataset_id_column=adapter_input.dataset_id_column,
-        dataset_context_column=adapter_input.dataset_context_column,
-        dataset_candidate_column=adapter_input.dataset_candidate_column,
-    )
-
-    write_json(run_dir / "run.json", run_metadata)
 
     run_variants_path = run_dir / "variants.json"
     if variants_path is not None:
@@ -87,15 +75,42 @@ def run_judge(
     elif run_variants_path.exists():
         variants = load_variants(run_variants_path)
     else:
+        paraphrases_for_generation = paraphrases_per_criterion or 1
         variants = make_variants(
             rubric=rubric,
             paraphrase_model=adapter_input.paraphrase_model,
             openrouter_api_key=adapter_input.openrouter_api_key,
             openai_api_key=adapter_input.openai_api_key,
             anthropic_api_key=adapter_input.anthropic_api_key,
-            paraphrases_per_criterion=paraphrases_per_criterion,
+            paraphrases_per_criterion=paraphrases_for_generation,
         )
         write_json(run_variants_path, variants)
+
+    inferred_paraphrases_per_criterion = infer_paraphrases_per_criterion(variants)
+    if (
+        paraphrases_per_criterion is not None
+        and inferred_paraphrases_per_criterion != paraphrases_per_criterion
+    ):
+        raise SystemExit(
+            "Provided --paraphrases-per-criterion does not match variants. "
+            f"Provided={paraphrases_per_criterion}, inferred={inferred_paraphrases_per_criterion}."
+        )
+
+    run_metadata = RunMetadata(
+        judge_model=adapter_input.judge_model,
+        paraphrase_model=adapter_input.paraphrase_model,
+        dataset_path=str(adapter_input.dataset_path),
+        rubric_path=str(adapter_input.rubric_path),
+        subset_name=subset_name,
+        scale_min=rubric.scale_min,
+        scale_max=rubric.scale_max,
+        paraphrases_per_criterion=inferred_paraphrases_per_criterion,
+        dataset_format=infer_dataset_format(adapter_input.dataset_path),
+        dataset_id_column=adapter_input.dataset_id_column,
+        dataset_context_column=adapter_input.dataset_context_column,
+        dataset_candidate_column=adapter_input.dataset_candidate_column,
+    )
+    write_json(run_dir / "run.json", run_metadata)
 
     call_log_path = run_dir / "call_log.jsonl"
     score_log_path = run_dir / "score_log.jsonl"
@@ -354,3 +369,36 @@ def variant_signatures(variants: list[RubricVariant]) -> list[tuple[str, tuple[t
         )
         for variant in variants
     ]
+
+
+PARAPHRASE_PERTURBATION_PATTERN = re.compile(r"^paraphrase__.+__(\d+)$")
+
+
+def infer_paraphrases_per_criterion(variants: list[RubricVariant]) -> int:
+    counts_by_criterion: dict[str, int] = {}
+    for variant in variants:
+        perturbation = variant.perturbation
+        if not perturbation.startswith("paraphrase__"):
+            continue
+        parts = perturbation.split("__")
+        if len(parts) != 3:
+            continue
+        if not PARAPHRASE_PERTURBATION_PATTERN.match(perturbation):
+            continue
+        criterion_id = parts[1]
+        counts_by_criterion[criterion_id] = counts_by_criterion.get(criterion_id, 0) + 1
+
+    if not counts_by_criterion:
+        return 0
+
+    unique_counts = set(counts_by_criterion.values())
+    if len(unique_counts) != 1:
+        details = ", ".join(
+            f"{criterion_id}:{count}"
+            for criterion_id, count in sorted(counts_by_criterion.items())
+        )
+        raise SystemExit(
+            "Inconsistent paraphrase counts across criteria in variants file: "
+            f"{details}."
+        )
+    return unique_counts.pop()
