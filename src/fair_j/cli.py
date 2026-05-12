@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from datetime import datetime
 from pathlib import Path
 
 from fair_j.evaluate_judge import evaluate_judge
@@ -10,6 +11,7 @@ from fair_j.io_utils import (
     create_run_dir,
     default_subset_name,
     load_rubric,
+    slugify_model_name,
     write_json,
 )
 from fair_j.perturbations import make_variants
@@ -54,6 +56,19 @@ def build_parser() -> argparse.ArgumentParser:
     run_pipeline_parser.add_argument("--html-title")
     run_pipeline_parser.set_defaults(func=cmd_run_evaluation)
 
+    run_multi_pipeline_parser = subparsers.add_parser(
+        "run-multi-pipeline",
+        help=(
+            "Run adapter + core evaluation for multiple judge models with shared variants "
+            "and render one comparison report."
+        ),
+    )
+    add_multi_pipeline_arguments(run_multi_pipeline_parser)
+    run_multi_pipeline_parser.add_argument("--html-output-path", type=Path)
+    run_multi_pipeline_parser.add_argument("--html-title")
+    run_multi_pipeline_parser.add_argument("--runs-root", type=Path)
+    run_multi_pipeline_parser.set_defaults(func=cmd_run_multi_evaluation)
+
     run_core_parser = subparsers.add_parser("run-core")
     run_core_parser.add_argument("--run-dir", type=Path, required=True)
     run_core_parser.set_defaults(func=cmd_run_core)
@@ -83,6 +98,28 @@ def add_pipeline_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--request-timeout", type=float, default=90.0)
     parser.add_argument("--subset-name")
     parser.add_argument("--run-dir", type=Path)
+    parser.add_argument("--variants-path", type=Path)
+    parser.add_argument("--seeds", type=int, default=1)
+    parser.add_argument("--paraphrases-per-criterion", type=int)
+    parser.add_argument("--workers", type=int, default=25)
+    parser.add_argument("--no-progress", action="store_true")
+
+
+def add_multi_pipeline_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--judge-model", dest="judge_models", action="append", required=True)
+    parser.add_argument("--paraphrase-model")
+    parser.add_argument("--openrouter-api-key")
+    parser.add_argument("--openai-api-key")
+    parser.add_argument("--anthropic-api-key")
+    parser.add_argument("--dataset-path", type=Path, required=True)
+    parser.add_argument("--rubric-path", type=Path, required=True)
+    parser.add_argument("--id-column", default="id")
+    parser.add_argument("--context-column", default="context")
+    parser.add_argument("--candidate-column", default="candidate")
+    parser.add_argument("--provider")
+    parser.add_argument("--provider-quantization")
+    parser.add_argument("--request-timeout", type=float, default=90.0)
+    parser.add_argument("--subset-name")
     parser.add_argument("--variants-path", type=Path)
     parser.add_argument("--seeds", type=int, default=1)
     parser.add_argument("--paraphrases-per-criterion", type=int)
@@ -145,6 +182,118 @@ def cmd_run_evaluation(args: argparse.Namespace) -> None:
     html_output_path = args.html_output_path or (run_dir / "report.html")
     output_path = render_comparison_report(
         run_dirs=[run_dir],
+        output_path=html_output_path,
+        title=args.html_title,
+    )
+    print(f"Wrote comparison report to {output_path}")
+
+
+def cmd_run_multi_evaluation(args: argparse.Namespace) -> None:
+    if args.workers < 1:
+        raise SystemExit("--workers must be at least 1.")
+    validate_positive_int_argument(value=args.seeds, argument_name="--seeds")
+    if args.paraphrases_per_criterion is not None:
+        validate_positive_int_argument(
+            value=args.paraphrases_per_criterion,
+            argument_name="--paraphrases-per-criterion",
+        )
+
+    judge_models = normalize_judge_models(args.judge_models)
+    paraphrase_model_input = resolve_paraphrase_model_argument(args)
+    paraphrase_model_for_keys = None if args.variants_path else paraphrase_model_input
+
+    validate_required_api_keys(
+        judge_model=None,
+        paraphrase_model=paraphrase_model_for_keys,
+        openrouter_api_key=args.openrouter_api_key,
+        openai_api_key=args.openai_api_key,
+        anthropic_api_key=args.anthropic_api_key,
+    )
+    for judge_model in judge_models:
+        validate_required_api_keys(
+            judge_model=judge_model,
+            paraphrase_model=None,
+            openrouter_api_key=args.openrouter_api_key,
+            openai_api_key=args.openai_api_key,
+            anthropic_api_key=args.anthropic_api_key,
+        )
+
+    rubric = load_rubric(args.rubric_path)
+    subset_name = args.subset_name or default_subset_name(args.dataset_path)
+    runs_root = args.runs_root or build_default_multi_runs_root(
+        base_dir=Path("runs"),
+        subset_name=subset_name,
+        judge_models=judge_models,
+        scale_min=rubric.scale_min,
+        scale_max=rubric.scale_max,
+    )
+    runs_root.mkdir(parents=True, exist_ok=True)
+
+    shared_variants_path = args.variants_path
+    if shared_variants_path is None:
+        shared_dir = runs_root / "shared"
+        shared_dir.mkdir(parents=True, exist_ok=True)
+        shared_variants_path = shared_dir / "variants.json"
+        variants = make_variants(
+            rubric=rubric,
+            paraphrase_model=paraphrase_model_input,
+            openrouter_api_key=args.openrouter_api_key,
+            openai_api_key=args.openai_api_key,
+            anthropic_api_key=args.anthropic_api_key,
+            paraphrases_per_criterion=args.paraphrases_per_criterion or 1,
+        )
+        write_json(shared_variants_path, variants)
+        print(f"Prepared shared variants at {shared_variants_path} ({len(variants)} variants)")
+    else:
+        print(f"Using existing shared variants from {shared_variants_path}")
+
+    run_dirs: list[Path] = []
+    progress_callback = None if args.no_progress else build_progress_callback()
+    runs_base_dir = runs_root / "runs"
+    for judge_model in judge_models:
+        run_dir = create_run_dir(runs_base_dir, slugify_model_name(judge_model))
+        adapter_input = AdapterInput(
+            judge_model=judge_model,
+            paraphrase_model=paraphrase_model_input,
+            openrouter_api_key=args.openrouter_api_key,
+            openai_api_key=args.openai_api_key,
+            anthropic_api_key=args.anthropic_api_key,
+            dataset_path=args.dataset_path,
+            rubric_path=args.rubric_path,
+            dataset_id_column=args.id_column,
+            dataset_context_column=args.context_column,
+            dataset_candidate_column=args.candidate_column,
+            provider_only=args.provider,
+            provider_quantization=args.provider_quantization,
+            request_timeout_seconds=args.request_timeout,
+        )
+
+        result = run_judge(
+            adapter_input=adapter_input,
+            run_dir=run_dir,
+            subset_name=subset_name,
+            seeds=args.seeds,
+            paraphrases_per_criterion=args.paraphrases_per_criterion,
+            variants_path=shared_variants_path,
+            workers=args.workers,
+            progress_callback=progress_callback,
+        )
+        print(f"[{judge_model}] Prepared run in {run_dir}")
+        print(
+            f"[{judge_model}] Calls: "
+            f"written={result['written_calls']} "
+            f"skipped={result['skipped_calls']} "
+            f"already_completed={result['completed_calls']}"
+        )
+
+        core_output = evaluate_judge(run_dir)
+        print(f"[{judge_model}] Wrote core output to {run_dir / 'core_output.json'}")
+        print(f"[{judge_model}] Dataset metrics keys: {list(core_output.dataset_level_scores.keys())}")
+        run_dirs.append(run_dir)
+
+    html_output_path = args.html_output_path or (runs_root / "comparison.html")
+    output_path = render_comparison_report(
+        run_dirs=run_dirs,
         output_path=html_output_path,
         title=args.html_title,
     )
@@ -295,9 +444,37 @@ def validate_positive_int_argument(*, value: int, argument_name: str) -> None:
         raise SystemExit(f"{argument_name} must be at least 1.")
 
 
+def build_default_multi_runs_root(
+    *,
+    base_dir: Path,
+    subset_name: str,
+    judge_models: list[str],
+    scale_min: int | float,
+    scale_max: int | float,
+) -> Path:
+    timestamp = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
+    return (
+        base_dir
+        / f"{timestamp}__multi_{len(judge_models)}models__{subset_name}__{scale_min}-{scale_max}"
+    )
+
+
 def resolve_paraphrase_model_argument(args: argparse.Namespace) -> str:
     if args.paraphrase_model:
         return str(args.paraphrase_model)
     if args.variants_path:
         return PRECOMPUTED_PARAPHRASE_MODEL
     raise SystemExit("--paraphrase-model is required unless --variants-path is provided.")
+
+
+def normalize_judge_models(raw_values: list[str]) -> list[str]:
+    judge_models: list[str] = []
+    for value in raw_values:
+        for item in value.split(","):
+            model = item.strip()
+            if not model:
+                continue
+            judge_models.append(model)
+    if not judge_models:
+        raise SystemExit("Provide at least one --judge-model.")
+    return judge_models

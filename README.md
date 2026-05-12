@@ -145,6 +145,28 @@ uv run fair-j run-pipeline \
   --rubric-path my_rubric.json
 ```
 
+Run everything for multiple judge models in one command:
+
+```bash
+fair-j run-multi-pipeline \
+  --judge-model qwen/qwen3-8b \
+  --judge-model qwen/qwen3-14b \
+  --judge-model openai/gpt-4.1-mini \
+  --dataset-path path/to/data.jsonl \
+  --rubric-path path/to/rubric.json \
+  --paraphrase-model openrouter/model \
+  --paraphrases-per-criterion 5 \
+  --seeds 1 \
+  --openrouter-api-key "$OPENROUTER_API_KEY" \
+  --openai-api-key "$OPENAI_API_KEY"
+```
+
+Notes:
+
+- `run-multi-pipeline` runs adapter + core for each judge model and renders one comparison HTML.
+- `--runs-root` is optional. If omitted, FAIR-J auto-creates a timestamped directory under `runs/`.
+- If `--variants-path` is provided, FAIR-J reuses that variants file for all models.
+
 Optional arguments:
 
 ```bash
