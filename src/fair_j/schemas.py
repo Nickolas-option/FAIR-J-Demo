@@ -60,6 +60,7 @@ class RunMetadata:
     subset_name: str
     scale_min: int | float
     scale_max: int | float
+    paraphrases_per_criterion: int = 1
     dataset_format: str | None = None
     dataset_id_column: str = "id"
     dataset_context_column: str = "context"

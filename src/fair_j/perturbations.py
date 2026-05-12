@@ -17,6 +17,7 @@ def make_variants(
     openrouter_api_key: str,
     openai_api_key: str | None = None,
     anthropic_api_key: str | None = None,
+    paraphrases_per_criterion: int = 1,
 ) -> list[RubricVariant]:
     variants = [build_baseline_variant(rubric)]
     variants.extend(
@@ -26,6 +27,7 @@ def make_variants(
             openrouter_api_key=openrouter_api_key,
             openai_api_key=openai_api_key,
             anthropic_api_key=anthropic_api_key,
+            paraphrases_per_criterion=paraphrases_per_criterion,
         )
     )
     variants.extend(make_delete_variants(rubric))
@@ -46,26 +48,31 @@ def make_paraphrase_variants(
     openrouter_api_key: str,
     openai_api_key: str | None = None,
     anthropic_api_key: str | None = None,
+    paraphrases_per_criterion: int = 1,
 ) -> list[RubricVariant]:
+    if paraphrases_per_criterion < 1:
+        raise ValueError("paraphrases_per_criterion must be at least 1.")
+
     variants: list[RubricVariant] = []
     for index, criterion in enumerate(rubric.criteria, start=1):
-        criteria = _clone_criteria(rubric.criteria)
-        criteria[index - 1].text = paraphrase_criterion_text(
-            criterion_text=criterion.text,
-            rubric_name=rubric.name,
-            criterion_id=criterion.id,
-            paraphrase_model=paraphrase_model,
-            openrouter_api_key=openrouter_api_key,
-            openai_api_key=openai_api_key,
-            anthropic_api_key=anthropic_api_key,
-        )
-        variants.append(
-            RubricVariant(
-                perturbation=f"paraphrase__{criterion.id}__01",
+        for paraphrase_index in range(1, paraphrases_per_criterion + 1):
+            criteria = _clone_criteria(rubric.criteria)
+            criteria[index - 1].text = paraphrase_criterion_text(
+                criterion_text=criterion.text,
                 rubric_name=rubric.name,
-                criteria=criteria,
+                criterion_id=criterion.id,
+                paraphrase_model=paraphrase_model,
+                openrouter_api_key=openrouter_api_key,
+                openai_api_key=openai_api_key,
+                anthropic_api_key=anthropic_api_key,
             )
-        )
+            variants.append(
+                RubricVariant(
+                    perturbation=f"paraphrase__{criterion.id}__{paraphrase_index:02d}",
+                    rubric_name=rubric.name,
+                    criteria=criteria,
+                )
+            )
     return variants
 
 

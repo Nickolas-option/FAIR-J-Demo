@@ -18,6 +18,8 @@ from fair_j.run_judge import run_judge
 from fair_j.model_clients import infer_model_provider
 from fair_j.schemas import AdapterInput
 
+PRECOMPUTED_PARAPHRASE_MODEL = "precomputed_variants"
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="fair-j")
@@ -26,6 +28,7 @@ def build_parser() -> argparse.ArgumentParser:
     make_variants_parser = subparsers.add_parser("make-variants")
     make_variants_parser.add_argument("--rubric-path", type=Path, required=True)
     make_variants_parser.add_argument("--paraphrase-model", required=True)
+    make_variants_parser.add_argument("--paraphrases-per-criterion", type=int, default=1)
     make_variants_parser.add_argument("--openrouter-api-key")
     make_variants_parser.add_argument("--openai-api-key")
     make_variants_parser.add_argument("--anthropic-api-key")
@@ -66,7 +69,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def add_pipeline_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--judge-model", required=True)
-    parser.add_argument("--paraphrase-model", required=True)
+    parser.add_argument("--paraphrase-model")
     parser.add_argument("--openrouter-api-key")
     parser.add_argument("--openai-api-key")
     parser.add_argument("--anthropic-api-key")
@@ -80,12 +83,18 @@ def add_pipeline_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--request-timeout", type=float, default=90.0)
     parser.add_argument("--subset-name")
     parser.add_argument("--run-dir", type=Path)
+    parser.add_argument("--variants-path", type=Path)
     parser.add_argument("--seeds", type=int, default=1)
+    parser.add_argument("--paraphrases-per-criterion", type=int, default=1)
     parser.add_argument("--workers", type=int, default=25)
     parser.add_argument("--no-progress", action="store_true")
 
 
 def cmd_make_variants(args: argparse.Namespace) -> None:
+    validate_positive_int_argument(
+        value=args.paraphrases_per_criterion,
+        argument_name="--paraphrases-per-criterion",
+    )
     validate_required_api_keys(
         judge_model=None,
         paraphrase_model=args.paraphrase_model,
@@ -100,6 +109,7 @@ def cmd_make_variants(args: argparse.Namespace) -> None:
         openrouter_api_key=args.openrouter_api_key,
         openai_api_key=args.openai_api_key,
         anthropic_api_key=args.anthropic_api_key,
+        paraphrases_per_criterion=args.paraphrases_per_criterion,
     )
     write_json(args.output_path, variants)
     print(f"Wrote {len(variants)} variants to {args.output_path}")
@@ -173,10 +183,17 @@ def build_progress_callback():
 def run_adapter_from_args(args: argparse.Namespace) -> dict[str, int | str]:
     if args.workers < 1:
         raise SystemExit("--workers must be at least 1.")
+    validate_positive_int_argument(value=args.seeds, argument_name="--seeds")
+    validate_positive_int_argument(
+        value=args.paraphrases_per_criterion,
+        argument_name="--paraphrases-per-criterion",
+    )
+    paraphrase_model_input = resolve_paraphrase_model_argument(args)
+    paraphrase_model_for_keys = None if args.variants_path else paraphrase_model_input
 
     validate_required_api_keys(
         judge_model=args.judge_model,
-        paraphrase_model=args.paraphrase_model,
+        paraphrase_model=paraphrase_model_for_keys,
         openrouter_api_key=args.openrouter_api_key,
         openai_api_key=args.openai_api_key,
         anthropic_api_key=args.anthropic_api_key,
@@ -184,7 +201,7 @@ def run_adapter_from_args(args: argparse.Namespace) -> dict[str, int | str]:
 
     adapter_input = AdapterInput(
         judge_model=args.judge_model,
-        paraphrase_model=args.paraphrase_model,
+        paraphrase_model=paraphrase_model_input,
         openrouter_api_key=args.openrouter_api_key,
         openai_api_key=args.openai_api_key,
         anthropic_api_key=args.anthropic_api_key,
@@ -214,6 +231,8 @@ def run_adapter_from_args(args: argparse.Namespace) -> dict[str, int | str]:
         run_dir=run_dir,
         subset_name=subset_name,
         seeds=args.seeds,
+        paraphrases_per_criterion=args.paraphrases_per_criterion,
+        variants_path=args.variants_path,
         workers=args.workers,
         progress_callback=None if args.no_progress else build_progress_callback(),
     )
@@ -268,3 +287,16 @@ def validate_required_api_keys(
 
     if missing_messages:
         raise SystemExit("Missing required API key(s):\n- " + "\n- ".join(missing_messages))
+
+
+def validate_positive_int_argument(*, value: int, argument_name: str) -> None:
+    if value < 1:
+        raise SystemExit(f"{argument_name} must be at least 1.")
+
+
+def resolve_paraphrase_model_argument(args: argparse.Namespace) -> str:
+    if args.paraphrase_model:
+        return str(args.paraphrase_model)
+    if args.variants_path:
+        return PRECOMPUTED_PARAPHRASE_MODEL
+    raise SystemExit("--paraphrase-model is required unless --variants-path is provided.")

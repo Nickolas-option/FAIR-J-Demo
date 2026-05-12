@@ -132,6 +132,8 @@ If you already have a rubric written as a free-form prompt, rewrite its scoring 
 
 4. Run the full pipeline.
 
+`--paraphrase-model` is required when variants are generated inside the run. If you pass `--variants-path`, you can omit `--paraphrase-model`.
+
 Required arguments only:
 
 ```bash
@@ -165,8 +167,15 @@ uv run fair-j run-pipeline \
   # Optional: defaults to auto-generated path inside runs/
   # --run-dir runs/my_first_run \
   \
+  # Optional: path to pre-generated variants.json to reuse the same paraphrases
+  # across multiple runs/models
+  # --variants-path runs/shared/fed_variants_p5.json \
+  \
   # Optional: defaults to 1
   # --seeds 3 \
+  \
+  # Optional: defaults to 1 (number of paraphrase variants generated per criterion)
+  # --paraphrases-per-criterion 5 \
   \
   # Optional: defaults to 25
   # --workers 1 \
@@ -247,6 +256,35 @@ Supported dataset formats:
 
 ## Commands
 
+The minimal example uses 3 files:
+
+- `examples/run_subset_dataset.jsonl`
+- `examples/run_subset_rubric.json`
+- `examples/run_pipeline.sh`
+
+If you want to run everything from the script:
+
+```bash
+export OPENROUTER_API_KEY=your_openrouter_key
+uv sync
+chmod +x examples/run_pipeline.sh
+./examples/run_pipeline.sh
+```
+
+If you prefer a fully manual one-command run:
+
+```bash
+uv run fair-j run-pipeline \
+  --judge-model qwen/qwen3-8b \
+  --paraphrase-model qwen/qwen3-8b \
+  --openrouter-api-key "$OPENROUTER_API_KEY" \
+  --dataset-path examples/run_subset_dataset.jsonl \
+  --rubric-path examples/run_subset_rubric.json \
+  --workers 1 \
+  --seeds 1 \
+  --paraphrases-per-criterion 1
+```
+
 Run the full evaluation pipeline in one command:
 
 ```bash
@@ -256,7 +294,30 @@ fair-j run-pipeline \
   --openrouter-api-key "$OPENROUTER_API_KEY" \
   --dataset-path path/to/data.jsonl \
   --rubric-path path/to/rubric.json \
-  --workers 25
+  --workers 25 \
+  --paraphrases-per-criterion 5
+```
+
+Reuse the same paraphrases across multiple judge models (recommended for fair comparison):
+
+```bash
+# 1) Generate shared variants once.
+fair-j make-variants \
+  --rubric-path path/to/rubric.json \
+  --paraphrase-model openrouter/model \
+  --paraphrases-per-criterion 5 \
+  --openrouter-api-key "$OPENROUTER_API_KEY" \
+  --output-path runs/shared/variants_p5.json
+
+# 2) Reuse the same variants for each judge model.
+fair-j run-pipeline \
+  --judge-model openrouter/judge-model-a \
+  --openrouter-api-key "$OPENROUTER_API_KEY" \
+  --dataset-path path/to/data.jsonl \
+  --rubric-path path/to/rubric.json \
+  --run-dir runs/judge_a \
+  --variants-path runs/shared/variants_p5.json \
+  --seeds 1
 ```
 
 Create rubric variants:
@@ -265,6 +326,7 @@ Create rubric variants:
 fair-j make-variants \
   --rubric-path path/to/rubric.json \
   --paraphrase-model openrouter/model \
+  --paraphrases-per-criterion 5 \
   --openrouter-api-key "$OPENROUTER_API_KEY" \
   --output-path path/to/variants.json
 ```
@@ -279,7 +341,8 @@ fair-j run-adapter \
   --dataset-path path/to/data.jsonl \
   --rubric-path path/to/rubric.json \
   --workers 10 \
-  --seeds 5
+  --seeds 5 \
+  --paraphrases-per-criterion 1
 ```
 
 Run core analysis:

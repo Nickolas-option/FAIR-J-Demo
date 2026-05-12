@@ -41,6 +41,8 @@ def run_judge(
     run_dir: Path,
     subset_name: str,
     seeds: int,
+    paraphrases_per_criterion: int = 1,
+    variants_path: Path | None = None,
     workers: int = 10,
     progress_callback: Callable[[int, int], None] | None = None,
 ) -> dict[str, int | str]:
@@ -59,6 +61,7 @@ def run_judge(
         subset_name=subset_name,
         scale_min=rubric.scale_min,
         scale_max=rubric.scale_max,
+        paraphrases_per_criterion=paraphrases_per_criterion,
         dataset_format=infer_dataset_format(adapter_input.dataset_path),
         dataset_id_column=adapter_input.dataset_id_column,
         dataset_context_column=adapter_input.dataset_context_column,
@@ -67,9 +70,22 @@ def run_judge(
 
     write_json(run_dir / "run.json", run_metadata)
 
-    variants_path = run_dir / "variants.json"
-    if variants_path.exists():
+    run_variants_path = run_dir / "variants.json"
+    if variants_path is not None:
+        if not variants_path.exists():
+            raise SystemExit(f"--variants-path does not exist: {variants_path}")
         variants = load_variants(variants_path)
+        if run_variants_path.exists():
+            existing = load_variants(run_variants_path)
+            if variant_signatures(existing) != variant_signatures(variants):
+                raise SystemExit(
+                    "run_dir already has a different variants.json. "
+                    "Use a new --run-dir or provide a matching --variants-path."
+                )
+        else:
+            write_json(run_variants_path, variants)
+    elif run_variants_path.exists():
+        variants = load_variants(run_variants_path)
     else:
         variants = make_variants(
             rubric=rubric,
@@ -77,8 +93,9 @@ def run_judge(
             openrouter_api_key=adapter_input.openrouter_api_key,
             openai_api_key=adapter_input.openai_api_key,
             anthropic_api_key=adapter_input.anthropic_api_key,
+            paraphrases_per_criterion=paraphrases_per_criterion,
         )
-        write_json(variants_path, variants)
+        write_json(run_variants_path, variants)
 
     call_log_path = run_dir / "call_log.jsonl"
     score_log_path = run_dir / "score_log.jsonl"
@@ -327,3 +344,13 @@ def format_pending_call_label(pending_call: PendingCall) -> str:
         f"perturbation={pending_call.variant.perturbation} "
         f"seed={pending_call.seed}"
     )
+
+
+def variant_signatures(variants: list[RubricVariant]) -> list[tuple[str, tuple[tuple[str, str], ...]]]:
+    return [
+        (
+            variant.perturbation,
+            tuple((criterion.id, criterion.text) for criterion in variant.criteria),
+        )
+        for variant in variants
+    ]
