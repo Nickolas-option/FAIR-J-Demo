@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import warnings
-from math import sqrt
 
 import numpy as np
 from scipy.stats import permutation_test, tstd, ttest_rel, wilcoxon
@@ -16,15 +15,13 @@ _TTEST_POWER_ANALYSIS = TTestPower()
 
 def compute_std_seed_default(
     criterion_means: dict[str, dict[int, float]],
-    n_examples: int,
 ) -> float | None:
     baseline_by_seed = criterion_means.get("baseline", {})
-    return normalized_std(list(baseline_by_seed.values()), n_examples)
+    return raw_std(list(baseline_by_seed.values()))
 
 
 def compute_std_perturbations(
     criterion_means: dict[str, dict[int, float]],
-    n_examples: int,
 ) -> float | None:
     seed_to_values: dict[int, list[float]] = {}
     for perturbation_scores in criterion_means.values():
@@ -36,29 +33,27 @@ def compute_std_perturbations(
         for values in seed_to_values.values()
         if (std_value := raw_std(values)) is not None
     ]
-    return normalize_uncertainty(mean_or_none(per_seed_stds), n_examples)
+    return mean_or_none(per_seed_stds)
 
 
 def compute_std_for_group(
     criterion_means: dict[str, dict[int, float]],
     group_name: str,
-    n_examples: int,
 ) -> float | None:
     values: list[float] = []
     for perturbation, perturbation_scores in criterion_means.items():
         if perturbation_group_name(perturbation) == group_name:
             values.extend(perturbation_scores.values())
-    return normalized_std(values, n_examples)
+    return raw_std(values)
 
 
 def compute_std_total(
     criterion_means: dict[str, dict[int, float]],
-    n_examples: int,
 ) -> float | None:
     values: list[float] = []
     for perturbation_scores in criterion_means.values():
         values.extend(perturbation_scores.values())
-    return normalized_std(values, n_examples)
+    return raw_std(values)
 
 
 def mean_or_none(values: list[float]) -> float | None:
@@ -122,7 +117,7 @@ def build_stat_test_block(group_comparison: dict[str, list[float]]) -> dict[str,
 
 
 def paired_permutation_test(differences: list[float]) -> float | None:
-    if not differences:
+    if len(differences) < 2:
         return None
 
     values = np.asarray(differences, dtype=float)
@@ -140,7 +135,7 @@ def paired_permutation_test(differences: list[float]) -> float | None:
 
 
 def wilcoxon_signed_rank_test(differences: list[float]) -> float | None:
-    if len(differences) < 1:
+    if len(differences) < 2:
         return None
     values = np.asarray(differences, dtype=float)
     if np.allclose(values, 0.0):
@@ -177,10 +172,6 @@ def paired_t_test(baseline: list[float], perturbation: list[float]) -> float | N
 
 def mean_statistic(values: np.ndarray, axis: int = 0) -> np.ndarray:
     return np.mean(values, axis=axis)
-
-
-def normalized_std(values: list[float], n_examples: int) -> float | None:
-    return normalize_uncertainty(raw_std(values), n_examples)
 
 
 def raw_std(values: list[float]) -> float | None:
@@ -240,12 +231,6 @@ def ratio_or_none(numerator: float | None, denominator: float | None) -> float |
     if numerator is None or denominator in (None, 0):
         return None
     return numerator / denominator
-
-
-def normalize_uncertainty(value: float | None, n_examples: int) -> float | None:
-    if value is None or n_examples <= 1:
-        return None
-    return value / sqrt(n_examples - 1)
 
 
 def compute_score_scale_span(scale_min: int | float, scale_max: int | float) -> float | None:

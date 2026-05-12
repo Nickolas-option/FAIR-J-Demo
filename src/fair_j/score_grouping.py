@@ -127,15 +127,14 @@ def collect_grouped_rank_metrics(
                 perturbation_scores[example_id]
                 for example_id in shared_example_ids
             ]
-            result = kendalltau(baseline_values, perturbation_values)
-            tau = float(result.statistic)
-            if tau != tau:
-                continue
             pair_counts = count_pair_relationships(baseline_values, perturbation_values)
-            grouped_metrics[group_name]["tau_b"].append(tau)
             grouped_metrics[group_name]["tie_pct"].append(pair_counts["tie_pct"])
             grouped_metrics[group_name]["concordant_pairs"].append(pair_counts["concordant_pairs"])
             grouped_metrics[group_name]["discordant_pairs"].append(pair_counts["discordant_pairs"])
+            result = kendalltau(baseline_values, perturbation_values)
+            tau = float(result.statistic)
+            if tau == tau:
+                grouped_metrics[group_name]["tau_b"].append(tau)
 
     return grouped_metrics
 

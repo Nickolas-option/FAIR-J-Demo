@@ -8,7 +8,6 @@ from fair_j.score_grouping import (
     collect_grouped_comparisons,
     collect_grouped_rank_metrics,
     compute_dataset_level_means,
-    count_unique_examples_per_criterion,
     empty_group_comparison,
     group_scores_by_condition,
 )
@@ -27,6 +26,8 @@ from fair_j.stats_utils import (
     normalize_by_scale,
     raw_std,
 )
+
+TOTAL_CRITERION_ID = "__total__"
 
 
 def evaluate_judge(run_dir: Path) -> CoreOutput:
@@ -53,7 +54,6 @@ def compute_dataset_level_scores(
 ) -> dict[str, object]:
     grouped_comparisons = collect_grouped_comparisons(score_rows)
     dataset_level_means = compute_dataset_level_means(score_rows)
-    criterion_example_counts = count_unique_examples_per_criterion(score_rows)
     criterion_ids = sorted({row.criterion_id for row in score_rows})
     results: dict[str, object] = {}
 
@@ -69,38 +69,42 @@ def compute_dataset_level_scores(
         paraphrase_diffs = paraphrase_comparison["differences"]
         deletion_diffs = deletion_comparison["differences"]
         criterion_means = dataset_level_means.get(criterion_id, {})
-        n_examples = criterion_example_counts.get(criterion_id, 0)
         baseline_scores = collect_baseline_scores(score_rows, criterion_id)
+        criterion_score_scale_span = compute_criterion_score_scale_span(
+            criterion_id,
+            score_rows,
+            score_scale_span,
+        )
         results[criterion_id] = {
             "baseline_score_std": raw_std(baseline_scores),
-            "std_seed_default": compute_std_seed_default(criterion_means, n_examples),
-            "std_perturbations": compute_std_perturbations(criterion_means, n_examples),
-            "std_paraphrases": compute_std_for_group(criterion_means, "paraphrases", n_examples),
-            "std_deletions": compute_std_for_group(criterion_means, "deletions", n_examples),
-            "std_total": compute_std_total(criterion_means, n_examples),
+            "std_seed_default": compute_std_seed_default(criterion_means),
+            "std_perturbations": compute_std_perturbations(criterion_means),
+            "std_paraphrases": compute_std_for_group(criterion_means, "paraphrases"),
+            "std_deletions": compute_std_for_group(criterion_means, "deletions"),
+            "std_total": compute_std_total(criterion_means),
             "bias_paraphrases": mean_or_none(paraphrase_diffs),
             "bias_to_mae_ratio_paraphrases": bias_to_mae_ratio(paraphrase_diffs),
             "bias_paraphrases_scale_normalized": normalize_by_scale(
                 mean_or_none(paraphrase_diffs),
-                score_scale_span,
+                criterion_score_scale_span,
             ),
             "mad_paraphrases": mean_absolute_or_none(paraphrase_diffs),
             "mad_paraphrases_scale_normalized": normalize_by_scale(
                 mean_absolute_or_none(paraphrase_diffs),
-                score_scale_span,
+                criterion_score_scale_span,
             ),
             "bias_deletions": mean_or_none(deletion_diffs),
             "bias_to_mae_ratio_deletions": bias_to_mae_ratio(deletion_diffs),
             "bias_deletions_scale_normalized": normalize_by_scale(
                 mean_or_none(deletion_diffs),
-                score_scale_span,
+                criterion_score_scale_span,
             ),
             "mad_deletions": mean_absolute_or_none(deletion_diffs),
             "mad_deletions_scale_normalized": normalize_by_scale(
                 mean_absolute_or_none(deletion_diffs),
-                score_scale_span,
+                criterion_score_scale_span,
             ),
-            "score_scale_span": score_scale_span,
+            "score_scale_span": criterion_score_scale_span,
             "stat_tests": {
                 "paraphrases_vs_baseline": build_stat_test_block(paraphrase_comparison),
                 "deletions_vs_baseline": build_stat_test_block(deletion_comparison),
@@ -178,27 +182,68 @@ def pooled_pair_count(rank_metrics: dict[str, list[float]], key: str) -> int:
 
 
 def build_total_score_rows(score_rows: list[ScoreLogRow]) -> list[ScoreLogRow]:
-    grouped_totals: dict[tuple[str, str, int, str], float] = {}
+    grouped_scores: dict[tuple[str, str, int, str], dict[str, float]] = {}
     grouped_call_ids: dict[tuple[str, str, int, str], str] = {}
+    baseline_scores: dict[tuple[str, int], dict[str, float]] = {}
 
     for row in score_rows:
+        if row.criterion_id == TOTAL_CRITERION_ID:
+            continue
         key = (row.example_id, row.perturbation, row.seed, row.call_id)
-        grouped_totals[key] = grouped_totals.get(key, 0.0) + float(row.score)
+        grouped_scores.setdefault(key, {})[row.criterion_id] = float(row.score)
         grouped_call_ids[key] = row.call_id
+        if row.perturbation == "baseline":
+            baseline_key = (row.example_id, row.seed)
+            baseline_scores.setdefault(baseline_key, {})[row.criterion_id] = float(row.score)
 
     total_rows: list[ScoreLogRow] = []
-    for (example_id, perturbation, seed, call_id), total_score in grouped_totals.items():
+    for (example_id, perturbation, seed, call_id), criterion_scores in grouped_scores.items():
+        total_score = compute_comparable_total_score(
+            criterion_scores=criterion_scores,
+            baseline_scores=baseline_scores.get((example_id, seed), {}),
+        )
         total_rows.append(
             ScoreLogRow(
                 call_id=grouped_call_ids[(example_id, perturbation, seed, call_id)],
                 example_id=example_id,
-                criterion_id="__total__",
+                criterion_id=TOTAL_CRITERION_ID,
                 perturbation=perturbation,
                 seed=seed,
-                score=int(round(total_score)),
+                score=total_score,
             )
         )
     return total_rows
+
+
+def compute_comparable_total_score(
+    criterion_scores: dict[str, float],
+    baseline_scores: dict[str, float],
+) -> float:
+    if not baseline_scores:
+        return sum(criterion_scores.values())
+    return sum(
+        criterion_scores.get(criterion_id, baseline_score)
+        for criterion_id, baseline_score in baseline_scores.items()
+    )
+
+
+def compute_criterion_score_scale_span(
+    criterion_id: str,
+    score_rows: list[ScoreLogRow],
+    score_scale_span: float | None,
+) -> float | None:
+    if score_scale_span is None:
+        return None
+    if criterion_id != TOTAL_CRITERION_ID:
+        return score_scale_span
+    baseline_criterion_ids = {
+        row.criterion_id
+        for row in score_rows
+        if row.perturbation == "baseline" and row.criterion_id != TOTAL_CRITERION_ID
+    }
+    if not baseline_criterion_ids:
+        return None
+    return score_scale_span * len(baseline_criterion_ids)
 
 
 def compute_per_example_seed_std(
@@ -214,6 +259,11 @@ def compute_per_example_seed_std(
 
     results: dict[str, object] = {}
     for criterion_id, criterion_scores in grouped_scores.items():
+        criterion_score_scale_span = compute_criterion_score_scale_span(
+            criterion_id,
+            score_rows,
+            score_scale_span,
+        )
         results[criterion_id] = {}
         for perturbation, perturbation_scores in criterion_scores.items():
             example_std_by_id: dict[str, float] = {}
@@ -233,11 +283,11 @@ def compute_per_example_seed_std(
                 "example_std_max": max_or_none(example_std_values),
                 "example_std_mean_scale_normalized": normalize_by_scale(
                     mean_or_none(example_std_values),
-                    score_scale_span,
+                    criterion_score_scale_span,
                 ),
                 "example_std_max_scale_normalized": normalize_by_scale(
                     max_or_none(example_std_values),
-                    score_scale_span,
+                    criterion_score_scale_span,
                 ),
                 "example_std_by_id": example_std_by_id,
             }

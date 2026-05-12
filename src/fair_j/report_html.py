@@ -1493,10 +1493,10 @@ def build_stat_tests_explorer(reports: list[ModelReport], criteria: list[str]) -
         '<div class="badge-row">'
         '<span class="badge">paired tests</span>'
         '<span class="badge">changed criterion selector</span>'
-        '<span class="badge">total score</span>'
+        '<span class="badge">comparable total score</span>'
         "</div>"
         f"{selector}"
-        '<p class="muted-note">`Same criterion score` compares the score of the changed rubric criterion when that score exists. For deletions of the selected criterion, the per-criterion block is shown as N/A and `total score` remains available.</p>'
+        '<p class="muted-note">`Same criterion score` compares the score of the changed rubric criterion when that score exists. For deletions of the selected criterion, the per-criterion block is shown as N/A and `total score` compares the baseline total against a comparable total with the deleted criterion held at its baseline value.</p>'
         f"{scopes}"
         "</div>"
         "</details>"
@@ -1779,7 +1779,7 @@ def build_example_viewer_items(report: ModelReport, criteria: list[str]) -> list
             perturbed_score = perturbation_scores.get(criterion_id)
             if baseline_score is None or perturbed_score is None:
                 continue
-            criterion_deltas[criterion_id] = perturbed_score - baseline_score
+            criterion_deltas[criterion_id] = baseline_score - perturbed_score
 
         if not criterion_deltas:
             continue
@@ -1891,7 +1891,7 @@ def build_dynamic_example_score_rows(
         criterion_id = criterion["id"]
         baseline_score = score_index.get((example_id, seed, "baseline", criterion_id))
         perturbed_score = score_index.get((example_id, seed, perturbation, criterion_id))
-        delta = None if baseline_score is None or perturbed_score is None else perturbed_score - baseline_score
+        delta = None if baseline_score is None or perturbed_score is None else baseline_score - perturbed_score
         rows.append(
             {
                 "criterion": criterion_id,
@@ -2043,7 +2043,7 @@ window.__FAIR_J_EXAMPLE_VIEWER__ = {{
         <h4>${{this.escapeHtml(item.perturbation_label)}}</h4>
         <span class="perturbation-badge">max Δ on ${{this.escapeHtml(focusCriterion)}}</span>
       </div>
-      <div class="viewer-meta">${{this.escapeHtml(item.example_label)}} | Δ perturbation-baseline = ${{this.escapeHtml(displayedDelta >= 0 ? "+" + displayedDelta : String(displayedDelta))}}</div>
+      <div class="viewer-meta">${{this.escapeHtml(item.example_label)}} | Δ baseline-perturbation = ${{this.escapeHtml(displayedDelta >= 0 ? "+" + displayedDelta : String(displayedDelta))}}</div>
       <table class="score-compare">
         <thead><tr><th>Criterion</th><th>Baseline</th><th>Perturbation</th><th>Δ</th></tr></thead>
         <tbody>${{scoreRows}}</tbody>
@@ -2181,7 +2181,7 @@ def classify_display_delta(delta: int | None) -> str:
 
 def format_criterion_label(criterion_id: str) -> str:
     if criterion_id == TOTAL_CRITERION_ID:
-        return "Total score"
+        return "Comparable total score"
     return criterion_id.replace("_", " ").title()
 
 
@@ -2249,11 +2249,11 @@ def compute_stat_test_group(
 
     score_rows = report.score_rows
     baseline_scores: dict[tuple[str, int], float] = {}
-    perturbation_scores: dict[tuple[str, int], float] = {}
+    paired_scores: list[tuple[float, float]] = []
 
     if metric_mode == "same_criterion":
         criterion_id = changed_criterion
-        perturbation_prefix = "paraphrase__" if group_key == "paraphrases_vs_baseline" else "delete__"
+        perturbation_scores: list[tuple[tuple[str, int], float]] = []
         for row in score_rows:
             row_criterion = str(row["criterion_id"])
             perturbation = str(row["perturbation"])
@@ -2264,27 +2264,47 @@ def compute_stat_test_group(
                 baseline_scores[key] = float(row["score"])
                 continue
             if perturbation_matches_changed_criterion(perturbation, group_key, changed_criterion):
-                perturbation_scores[key] = float(row["score"])
+                perturbation_scores.append((key, float(row["score"])))
+        paired_scores = [
+            (baseline_scores[key], perturbation_score)
+            for key, perturbation_score in perturbation_scores
+            if key in baseline_scores
+        ]
     else:
-        totals: dict[tuple[str, int, str], float] = {}
+        grouped_scores: dict[tuple[str, int, str], dict[str, float]] = {}
         for row in score_rows:
             if str(row["criterion_id"]) == TOTAL_CRITERION_ID:
                 continue
             key = (str(row["example_id"]), int(row["seed"]), str(row["perturbation"]))
-            totals[key] = totals.get(key, 0.0) + float(row["score"])
+            grouped_scores.setdefault(key, {})[str(row["criterion_id"])] = float(row["score"])
 
-        for (example_id, seed, perturbation), total_score in totals.items():
+        baseline_score_maps: dict[tuple[str, int], dict[str, float]] = {}
+        perturbation_score_maps: list[tuple[tuple[str, int], dict[str, float]]] = []
+        for (example_id, seed, perturbation), criterion_scores in grouped_scores.items():
             key = (example_id, seed)
             if perturbation == "baseline":
-                baseline_scores[key] = total_score
+                baseline_score_maps[key] = criterion_scores
             elif perturbation_matches_changed_criterion(perturbation, group_key, changed_criterion):
-                perturbation_scores[key] = total_score
+                perturbation_score_maps.append((key, criterion_scores))
 
-    keys = sorted(set(baseline_scores) & set(perturbation_scores))
+        for key, criterion_scores in perturbation_score_maps:
+            baseline_score_map = baseline_score_maps.get(key)
+            if not baseline_score_map:
+                continue
+            baseline_total = sum(baseline_score_map.values())
+            perturbation_total = sum(
+                criterion_scores.get(criterion_id, baseline_score)
+                for criterion_id, baseline_score in baseline_score_map.items()
+            )
+            paired_scores.append((baseline_total, perturbation_total))
+
     comparison = {
-        "baseline": [baseline_scores[key] for key in keys],
-        "perturbation": [perturbation_scores[key] for key in keys],
-        "differences": [baseline_scores[key] - perturbation_scores[key] for key in keys],
+        "baseline": [baseline_score for baseline_score, _perturbation_score in paired_scores],
+        "perturbation": [perturbation_score for _baseline_score, perturbation_score in paired_scores],
+        "differences": [
+            baseline_score - perturbation_score
+            for baseline_score, perturbation_score in paired_scores
+        ],
     }
     if not comparison["differences"]:
         return empty_stat_block()

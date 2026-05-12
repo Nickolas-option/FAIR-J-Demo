@@ -84,7 +84,7 @@ class ScoreLogRow:
     criterion_id: str
     perturbation: str
     seed: int
-    score: int
+    score: int | float
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
