@@ -96,8 +96,11 @@ def load_dataset_examples(
     id_column: str = "id",
     context_column: str = "context",
     candidate_column: str = "candidate",
+    limit: int | None = None,
 ) -> list[DatasetExample]:
     rows = read_dataset_rows(dataset_path)
+    if limit is not None:
+        rows = rows[:limit]
     return [
         build_dataset_example(
             row,

@@ -34,6 +34,7 @@ def build_parser() -> argparse.ArgumentParser:
     make_variants_parser.add_argument("--openrouter-api-key")
     make_variants_parser.add_argument("--openai-api-key")
     make_variants_parser.add_argument("--anthropic-api-key")
+    make_variants_parser.add_argument("--bedrock-region", default="us-east-1")
     make_variants_parser.add_argument("--output-path", type=Path, required=True)
     make_variants_parser.set_defaults(func=cmd_make_variants)
 
@@ -95,7 +96,7 @@ def add_pipeline_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--candidate-column", default="candidate")
     parser.add_argument("--provider")
     parser.add_argument("--provider-quantization")
-    parser.add_argument("--request-timeout", type=float, default=90.0)
+    parser.add_argument("--request-timeout", type=float, default=300.0)
     parser.add_argument("--subset-name")
     parser.add_argument("--run-dir", type=Path)
     parser.add_argument("--variants-path", type=Path)
@@ -103,6 +104,8 @@ def add_pipeline_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--paraphrases-per-criterion", type=int)
     parser.add_argument("--workers", type=int, default=25)
     parser.add_argument("--no-progress", action="store_true")
+    parser.add_argument("--bedrock-region", default="us-east-1")
+    parser.add_argument("--limit-examples", type=int, default=None)
 
 
 def add_multi_pipeline_arguments(parser: argparse.ArgumentParser) -> None:
@@ -118,13 +121,15 @@ def add_multi_pipeline_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--candidate-column", default="candidate")
     parser.add_argument("--provider")
     parser.add_argument("--provider-quantization")
-    parser.add_argument("--request-timeout", type=float, default=90.0)
+    parser.add_argument("--request-timeout", type=float, default=300.0)
     parser.add_argument("--subset-name")
     parser.add_argument("--variants-path", type=Path)
     parser.add_argument("--seeds", type=int, default=1)
     parser.add_argument("--paraphrases-per-criterion", type=int)
     parser.add_argument("--workers", type=int, default=25)
     parser.add_argument("--no-progress", action="store_true")
+    parser.add_argument("--bedrock-region", default="us-east-1")
+    parser.add_argument("--limit-examples", type=int, default=None)
 
 
 def cmd_make_variants(args: argparse.Namespace) -> None:
@@ -147,6 +152,7 @@ def cmd_make_variants(args: argparse.Namespace) -> None:
         openai_api_key=args.openai_api_key,
         anthropic_api_key=args.anthropic_api_key,
         paraphrases_per_criterion=args.paraphrases_per_criterion,
+        bedrock_region=args.bedrock_region,
     )
     write_json(args.output_path, variants)
     print(f"Wrote {len(variants)} variants to {args.output_path}")
@@ -241,6 +247,7 @@ def cmd_run_multi_evaluation(args: argparse.Namespace) -> None:
             openai_api_key=args.openai_api_key,
             anthropic_api_key=args.anthropic_api_key,
             paraphrases_per_criterion=args.paraphrases_per_criterion or 1,
+            bedrock_region=args.bedrock_region,
         )
         write_json(shared_variants_path, variants)
         print(f"Prepared shared variants at {shared_variants_path} ({len(variants)} variants)")
@@ -266,6 +273,7 @@ def cmd_run_multi_evaluation(args: argparse.Namespace) -> None:
             provider_only=args.provider,
             provider_quantization=args.provider_quantization,
             request_timeout_seconds=args.request_timeout,
+            bedrock_region=args.bedrock_region,
         )
 
         result = run_judge(
@@ -277,6 +285,7 @@ def cmd_run_multi_evaluation(args: argparse.Namespace) -> None:
             variants_path=shared_variants_path,
             workers=args.workers,
             progress_callback=progress_callback,
+            limit=args.limit_examples,
         )
         print(f"[{judge_model}] Prepared run in {run_dir}")
         print(
@@ -363,6 +372,7 @@ def run_adapter_from_args(args: argparse.Namespace) -> dict[str, int | str]:
         provider_only=args.provider,
         provider_quantization=args.provider_quantization,
         request_timeout_seconds=args.request_timeout,
+        bedrock_region=args.bedrock_region,
     )
 
     rubric = load_rubric(args.rubric_path)
@@ -385,6 +395,7 @@ def run_adapter_from_args(args: argparse.Namespace) -> dict[str, int | str]:
         variants_path=args.variants_path,
         workers=args.workers,
         progress_callback=None if args.no_progress else build_progress_callback(),
+        limit=args.limit_examples,
     )
 
 
@@ -410,6 +421,8 @@ def validate_required_api_keys(
         if not model_name:
             continue
         provider = infer_model_provider(model_name)
+        if provider == "bedrock":
+            continue
         if provider == "openai":
             required.append((role, model_name, openai_api_key))
         elif provider == "anthropic":

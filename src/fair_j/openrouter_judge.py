@@ -1,13 +1,21 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
+import time
 
 from anthropic import Anthropic
 from openai import OpenAI
 from openai.types.chat import ChatCompletion
 
-from fair_j.model_clients import build_openai_client, completion_text, infer_model_provider
+from fair_j.model_clients import (
+    build_bedrock_client,
+    build_openai_client,
+    completion_text,
+    infer_model_provider,
+    resolve_bedrock_model_id,
+)
 from fair_j.schemas import AdapterInput
 
 
@@ -100,6 +108,15 @@ def call_openrouter_judge(
             scale_max=scale_max,
             prompt_text=prompt_text,
         )
+    if provider == "bedrock":
+        return call_bedrock_judge(
+            adapter_input=adapter_input,
+            judge_model=judge_model,
+            expected_ids=expected_ids,
+            scale_min=scale_min,
+            scale_max=scale_max,
+            prompt_text=prompt_text,
+        )
     return call_openrouter_judge_json_object(
         openai_client=build_openai_client(adapter_input, judge_model),
         adapter_input=adapter_input,
@@ -109,6 +126,58 @@ def call_openrouter_judge(
         scale_max=scale_max,
         prompt_text=prompt_text,
     )
+
+
+def call_bedrock_judge(
+    adapter_input: AdapterInput,
+    judge_model: str,
+    expected_ids: set[str],
+    scale_min: int | float,
+    scale_max: int | float,
+    prompt_text: str,
+) -> tuple[dict[str, int | float], str]:
+    bedrock_model_id = resolve_bedrock_model_id(judge_model)
+    client = build_bedrock_client(adapter_input.bedrock_region, adapter_input.request_timeout_seconds)
+
+    last_error: Exception | None = None
+    for attempt in range(1, BEDROCK_JUDGE_MAX_RETRIES + 1):
+        try:
+            inference_config: dict[str, object] = {"maxTokens": 4096}
+            if "opus-4-7" not in bedrock_model_id:
+                inference_config["temperature"] = 0
+            response = client.converse(
+                modelId=bedrock_model_id,
+                system=[{"text": build_judge_system_prompt()}],
+                messages=[{"role": "user", "content": [{"text": prompt_text}]}],
+                inferenceConfig=inference_config,
+            )
+            content = strip_markdown_fences(extract_bedrock_text(response))
+            payload = json.loads(content)
+            if not isinstance(payload, dict):
+                raise ValueError("Bedrock judge response is not a JSON object.")
+            scores = extract_scores_payload(payload)
+            if not isinstance(scores, dict):
+                raise ValueError("Bedrock judge response does not contain an object under 'scores'.")
+            numeric_scores: dict[str, float] = {}
+            for criterion_id, score in scores.items():
+                numeric_scores[str(criterion_id)] = float(score)
+            validated = validate_openrouter_scores(
+                scores=numeric_scores,
+                expected_ids=expected_ids,
+                scale_min=scale_min,
+                scale_max=scale_max,
+            )
+            return validated, json.dumps(response, default=str)
+        except Exception as error:
+            last_error = error
+            report_retry_error("bedrock", attempt, BEDROCK_JUDGE_MAX_RETRIES, error)
+            if attempt < BEDROCK_JUDGE_MAX_RETRIES:
+                is_throttle = type(error).__name__ in ("ThrottlingException", "TooManyRequestsException")
+                time.sleep(30 * attempt if is_throttle else 2 ** attempt)
+
+    raise RuntimeError(
+        f"Bedrock judge call failed after {BEDROCK_JUDGE_MAX_RETRIES} attempts."
+    ) from last_error
 
 
 def call_openai_judge(
@@ -157,7 +226,7 @@ def call_anthropic_judge(
         system=build_judge_system_prompt(),
         messages=[{"role": "user", "content": prompt_text}],
     )
-    payload_text = completion_text(completion)
+    payload_text = strip_markdown_fences(completion_text(completion))
     payload = json.loads(payload_text)
     if not isinstance(payload, dict):
         raise ValueError("Anthropic judge response is not a JSON object.")
@@ -280,6 +349,25 @@ def validate_openrouter_scores(
         if score < scale_min or score > scale_max:
             raise ValueError(f"Score {score} is outside rubric scale [{scale_min}, {scale_max}].")
     return scores
+
+
+BEDROCK_JUDGE_MAX_RETRIES = 5
+
+_MARKDOWN_FENCE_RE = re.compile(r"^```(?:json)?\s*\n?(.*?)\n?```\s*$", re.DOTALL)
+
+
+def strip_markdown_fences(text: str) -> str:
+    match = _MARKDOWN_FENCE_RE.match(text.strip())
+    return match.group(1).strip() if match else text.strip()
+
+
+def extract_bedrock_text(response: dict) -> str:
+    for block in response.get("output", {}).get("message", {}).get("content", []):
+        text = block.get("text", "")
+        if text:
+            return text
+    stop_reason = response.get("stopReason", "unknown")
+    raise ValueError(f"Bedrock response contained no text content (stopReason={stop_reason!r}).")
 
 
 def report_retry_error(

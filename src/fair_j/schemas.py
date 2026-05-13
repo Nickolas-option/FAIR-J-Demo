@@ -20,6 +20,7 @@ class AdapterInput:
     provider_only: str | None = None
     provider_quantization: str | None = None
     request_timeout_seconds: float = 90.0
+    bedrock_region: str = "us-east-1"
 
 
 @dataclass

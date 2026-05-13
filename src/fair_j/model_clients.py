@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 
+import boto3
 from anthropic import Anthropic
+from botocore.config import Config
 from openai import OpenAI
 
 from fair_j.schemas import AdapterInput
@@ -10,6 +12,16 @@ from fair_j.schemas import AdapterInput
 
 OPENAI_MODEL_PREFIX = "openai/"
 ANTHROPIC_MODEL_PREFIX = "anthropic/"
+BEDROCK_MODEL_PREFIX = "bedrock/"
+
+BEDROCK_ALIAS_TO_MODEL_ID: dict[str, str] = {
+    "claude-haiku-4-5": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+    "claude-sonnet-4-6": "us.anthropic.claude-sonnet-4-6",
+    "claude-opus-4": "us.anthropic.claude-opus-4-20250514-v1:0",
+    "claude-opus-4-5": "us.anthropic.claude-opus-4-5-20251101-v1:0",
+    "claude-opus-4-7": "us.anthropic.claude-opus-4-7",
+    "gpt-oss-120b": "openai.gpt-oss-120b-1:0",
+}
 
 
 def infer_model_provider(model_name: str) -> str:
@@ -17,7 +29,29 @@ def infer_model_provider(model_name: str) -> str:
         return "openai"
     if model_name.startswith(ANTHROPIC_MODEL_PREFIX):
         return "anthropic"
+    if model_name.startswith(BEDROCK_MODEL_PREFIX):
+        return "bedrock"
     return "openrouter"
+
+
+def resolve_bedrock_model_id(model_name: str) -> str:
+    alias = model_name.removeprefix(BEDROCK_MODEL_PREFIX)
+    model_id = BEDROCK_ALIAS_TO_MODEL_ID.get(alias)
+    if model_id is None:
+        known = ", ".join(sorted(BEDROCK_ALIAS_TO_MODEL_ID))
+        raise ValueError(
+            f"Unknown Bedrock model alias '{alias}'. Known aliases: {known}."
+        )
+    return model_id
+
+
+def build_bedrock_client(region: str, timeout_seconds: float = 90.0):
+    config = Config(
+        connect_timeout=10,
+        read_timeout=timeout_seconds,
+        retries={"max_attempts": 0},
+    )
+    return boto3.client("bedrock-runtime", region_name=region, config=config)
 
 
 def build_openai_client(adapter_input: AdapterInput, model_name: str):

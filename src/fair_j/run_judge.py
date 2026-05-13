@@ -46,6 +46,7 @@ def run_judge(
     variants_path: Path | None = None,
     workers: int = 10,
     progress_callback: Callable[[int, int], None] | None = None,
+    limit: int | None = None,
 ) -> dict[str, int | str]:
     if paraphrases_per_criterion is not None and paraphrases_per_criterion < 1:
         raise SystemExit("--paraphrases-per-criterion must be at least 1.")
@@ -55,6 +56,7 @@ def run_judge(
         id_column=adapter_input.dataset_id_column,
         context_column=adapter_input.dataset_context_column,
         candidate_column=adapter_input.dataset_candidate_column,
+        limit=limit,
     )
     rubric = load_rubric(adapter_input.rubric_path)
 
@@ -83,6 +85,7 @@ def run_judge(
             openai_api_key=adapter_input.openai_api_key,
             anthropic_api_key=adapter_input.anthropic_api_key,
             paraphrases_per_criterion=paraphrases_for_generation,
+            bedrock_region=adapter_input.bedrock_region,
         )
         write_json(run_variants_path, variants)
 

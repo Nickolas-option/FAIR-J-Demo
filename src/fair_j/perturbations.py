@@ -1,9 +1,17 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 from anthropic import Anthropic
 from openai import OpenAI
 
-from fair_j.model_clients import build_paraphrase_client, completion_text, infer_model_provider
+from fair_j.model_clients import (
+    build_bedrock_client,
+    build_paraphrase_client,
+    completion_text,
+    infer_model_provider,
+    resolve_bedrock_model_id,
+)
 from fair_j.schemas import Criterion, Rubric, RubricVariant
 
 
@@ -14,10 +22,11 @@ PARAPHRASE_MAX_RETRIES = 5
 def make_variants(
     rubric: Rubric,
     paraphrase_model: str,
-    openrouter_api_key: str,
+    openrouter_api_key: str | None = None,
     openai_api_key: str | None = None,
     anthropic_api_key: str | None = None,
     paraphrases_per_criterion: int = 1,
+    bedrock_region: str = "us-east-1",
 ) -> list[RubricVariant]:
     variants = [build_baseline_variant(rubric)]
     variants.extend(
@@ -28,6 +37,7 @@ def make_variants(
             openai_api_key=openai_api_key,
             anthropic_api_key=anthropic_api_key,
             paraphrases_per_criterion=paraphrases_per_criterion,
+            bedrock_region=bedrock_region,
         )
     )
     variants.extend(make_delete_variants(rubric))
@@ -45,10 +55,11 @@ def build_baseline_variant(rubric: Rubric) -> RubricVariant:
 def make_paraphrase_variants(
     rubric: Rubric,
     paraphrase_model: str,
-    openrouter_api_key: str,
+    openrouter_api_key: str | None = None,
     openai_api_key: str | None = None,
     anthropic_api_key: str | None = None,
     paraphrases_per_criterion: int = 1,
+    bedrock_region: str = "us-east-1",
 ) -> list[RubricVariant]:
     if paraphrases_per_criterion < 1:
         raise ValueError("paraphrases_per_criterion must be at least 1.")
@@ -65,6 +76,7 @@ def make_paraphrase_variants(
                 openrouter_api_key=openrouter_api_key,
                 openai_api_key=openai_api_key,
                 anthropic_api_key=anthropic_api_key,
+                bedrock_region=bedrock_region,
             )
             variants.append(
                 RubricVariant(
@@ -81,9 +93,10 @@ def paraphrase_criterion_text(
     rubric_name: str,
     criterion_id: str,
     paraphrase_model: str,
-    openrouter_api_key: str,
+    openrouter_api_key: str | None = None,
     openai_api_key: str | None = None,
     anthropic_api_key: str | None = None,
+    bedrock_region: str = "us-east-1",
 ) -> str:
     provider = infer_model_provider(paraphrase_model)
     if provider == "openai":
@@ -107,6 +120,7 @@ def paraphrase_criterion_text(
                 anthropic_api_key=anthropic_api_key,
                 paraphrase_model=paraphrase_model,
                 prompt=prompt,
+                bedrock_region=bedrock_region,
             )
             paraphrase = normalize_paraphrase_output(completion_text(completion))
             if paraphrase and paraphrase != criterion_text:
@@ -124,13 +138,34 @@ def paraphrase_criterion_text(
 
 
 def create_paraphrase_completion(
-    openrouter_api_key: str,
+    openrouter_api_key: str | None,
     openai_api_key: str | None,
     anthropic_api_key: str | None,
     paraphrase_model: str,
     prompt: str,
+    bedrock_region: str = "us-east-1",
 ):
     provider = infer_model_provider(paraphrase_model)
+    if provider == "bedrock":
+        bedrock_model_id = resolve_bedrock_model_id(paraphrase_model)
+        client = build_bedrock_client(bedrock_region)
+        response = client.converse(
+            modelId=bedrock_model_id,
+            system=[{"text": (
+                "You rewrite evaluation rubric criteria. "
+                "Return exactly one paraphrased criterion sentence. "
+                "Preserve meaning, scale, and constraints. "
+                "Do not add explanations, bullet points, or quotes."
+            )}],
+            messages=[{"role": "user", "content": [{"text": prompt}]}],
+            inferenceConfig={"maxTokens": 1024, "temperature": 0},
+        )
+        content = response["output"]["message"]["content"][0]["text"]
+        result = SimpleNamespace()
+        result.choices = [SimpleNamespace()]
+        result.choices[0].message = SimpleNamespace()
+        result.choices[0].message.content = content
+        return result
     if provider == "anthropic":
         client = Anthropic(
             api_key=anthropic_api_key,
