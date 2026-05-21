@@ -10,5 +10,7 @@
   "dataset_format": "jsonl",
   "dataset_id_column": "id",
   "dataset_context_column": "context",
-  "dataset_candidate_column": "candidate"
+  "dataset_candidate_column": "candidate",
+  "seeds": 1,
+  "limit_examples": 20
 }
