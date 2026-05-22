@@ -6,6 +6,12 @@ from scipy.stats import kendalltau
 
 from fair_j.schemas import ScoreLogRow
 
+PARAPHRASES_GROUP = "paraphrases"
+PARAPHRASES_ALL_GROUP = "paraphrases_all"
+PARAPHRASES_SAME_CRITERION_GROUP = "paraphrases_same_criterion"
+PARAPHRASES_CROSS_CRITERION_GROUP = "paraphrases_cross_criterion"
+DELETIONS_GROUP = "deletions"
+
 
 def compute_dataset_level_means(
     score_rows: list[ScoreLogRow],
@@ -50,11 +56,23 @@ def count_unique_examples_per_criterion(score_rows: list[ScoreLogRow]) -> dict[s
     }
 
 
+def parse_perturbation(perturbation: str) -> dict[str, str | None]:
+    if perturbation == "baseline":
+        return {"kind": "baseline", "criterion_id": None}
+
+    parts = perturbation.split("__")
+    if perturbation.startswith("paraphrase__") and len(parts) >= 2:
+        return {"kind": "paraphrase", "criterion_id": parts[1]}
+    if perturbation.startswith("delete__") and len(parts) >= 2:
+        return {"kind": "deletion", "criterion_id": parts[1]}
+    return {"kind": "other", "criterion_id": None}
+
+
 def collect_grouped_comparisons(
     score_rows: list[ScoreLogRow],
-) -> dict[str, dict[str, dict[str, list[float]]]]:
+) -> dict[str, dict[str, dict[str, object]]]:
     baseline_scores: dict[tuple[str, str, int], float] = {}
-    grouped_comparisons: dict[str, dict[str, dict[str, list[float]]]] = {}
+    grouped_comparisons: dict[str, dict[str, dict[str, object]]] = {}
 
     for row in score_rows:
         if row.perturbation == "baseline":
@@ -65,8 +83,9 @@ def collect_grouped_comparisons(
         if row.perturbation == "baseline":
             continue
 
-        group_name = perturbation_group_name(row.perturbation)
-        if group_name is None:
+        parsed = parse_perturbation(row.perturbation)
+        kind = parsed["kind"]
+        if kind not in ("paraphrase", "deletion"):
             continue
 
         key = (row.example_id, row.criterion_id, row.seed)
@@ -78,15 +97,71 @@ def collect_grouped_comparisons(
         criterion_groups = grouped_comparisons.setdefault(
             row.criterion_id,
             {
-                "paraphrases": empty_group_comparison(),
-                "deletions": empty_group_comparison(),
+                PARAPHRASES_ALL_GROUP: empty_group_comparison(),
+                PARAPHRASES_SAME_CRITERION_GROUP: empty_group_comparison(),
+                PARAPHRASES_CROSS_CRITERION_GROUP: empty_group_comparison(),
+                DELETIONS_GROUP: empty_group_comparison(),
             },
         )
-        criterion_groups[group_name]["baseline"].append(baseline_score)
-        criterion_groups[group_name]["perturbation"].append(float(row.score))
-        criterion_groups[group_name]["differences"].append(difference)
+
+        if kind == "paraphrase":
+            append_group_comparison(
+                criterion_groups[PARAPHRASES_ALL_GROUP],
+                example_id=row.example_id,
+                baseline_score=baseline_score,
+                perturbation_score=float(row.score),
+                difference=difference,
+            )
+            target_criterion_id = parsed["criterion_id"]
+            paraphrase_group = (
+                PARAPHRASES_SAME_CRITERION_GROUP
+                if target_criterion_id == row.criterion_id
+                else PARAPHRASES_CROSS_CRITERION_GROUP
+            )
+            append_group_comparison(
+                criterion_groups[paraphrase_group],
+                example_id=row.example_id,
+                baseline_score=baseline_score,
+                perturbation_score=float(row.score),
+                difference=difference,
+            )
+            continue
+
+        append_group_comparison(
+            criterion_groups[DELETIONS_GROUP],
+            example_id=row.example_id,
+            baseline_score=baseline_score,
+            perturbation_score=float(row.score),
+            difference=difference,
+        )
 
     return grouped_comparisons
+
+
+def append_group_comparison(
+    group_comparison: dict[str, object],
+    *,
+    example_id: str,
+    baseline_score: float,
+    perturbation_score: float,
+    difference: float,
+) -> None:
+    group_comparison["baseline"].append(baseline_score)
+    group_comparison["perturbation"].append(perturbation_score)
+    group_comparison["differences"].append(difference)
+    group_comparison["example_ids"].append(example_id)
+    pairs_by_example = group_comparison["pairs_by_example"]
+    example_entry = pairs_by_example.setdefault(
+        example_id,
+        {
+            "baseline": [],
+            "perturbation": [],
+            "differences": [],
+        },
+    )
+    example_entry["baseline"].append(baseline_score)
+    example_entry["perturbation"].append(perturbation_score)
+    example_entry["differences"].append(difference)
 
 
 def collect_grouped_rank_metrics(
@@ -94,18 +169,8 @@ def collect_grouped_rank_metrics(
 ) -> dict[str, dict[str, list[float]]]:
     baseline_by_seed = criterion_scores.get("baseline", {})
     grouped_metrics: dict[str, dict[str, list[float]]] = {
-        "paraphrases": {
-            "tau_b": [],
-            "tie_pct": [],
-            "concordant_pairs": [],
-            "discordant_pairs": [],
-        },
-        "deletions": {
-            "tau_b": [],
-            "tie_pct": [],
-            "concordant_pairs": [],
-            "discordant_pairs": [],
-        },
+        PARAPHRASES_GROUP: empty_group_rank_metrics(),
+        DELETIONS_GROUP: empty_group_rank_metrics(),
     }
 
     for perturbation, perturbation_by_seed in criterion_scores.items():
@@ -137,6 +202,15 @@ def collect_grouped_rank_metrics(
                 grouped_metrics[group_name]["tau_b"].append(tau)
 
     return grouped_metrics
+
+
+def empty_group_rank_metrics() -> dict[str, list[float]]:
+    return {
+        "tau_b": [],
+        "tie_pct": [],
+        "concordant_pairs": [],
+        "discordant_pairs": [],
+    }
 
 
 def count_pair_relationships(
@@ -172,17 +246,20 @@ def count_pair_relationships(
     }
 
 
-def empty_group_comparison() -> dict[str, list[float]]:
+def empty_group_comparison() -> dict[str, object]:
     return {
         "baseline": [],
         "perturbation": [],
         "differences": [],
+        "example_ids": [],
+        "pairs_by_example": {},
     }
 
 
 def perturbation_group_name(perturbation: str) -> str | None:
-    if perturbation.startswith("paraphrase__"):
-        return "paraphrases"
-    if perturbation.startswith("delete__"):
-        return "deletions"
+    parsed = parse_perturbation(perturbation)
+    if parsed["kind"] == "paraphrase":
+        return PARAPHRASES_GROUP
+    if parsed["kind"] == "deletion":
+        return DELETIONS_GROUP
     return None

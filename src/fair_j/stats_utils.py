@@ -81,17 +81,23 @@ def max_or_none(values: list[float]) -> float | None:
 
 
 def build_stat_test_block(group_comparison: dict[str, list[float]]) -> dict[str, object]:
-    baseline = group_comparison["baseline"]
-    perturbation = group_comparison["perturbation"]
-    differences = group_comparison["differences"]
+    aggregated = aggregate_comparison_by_example(group_comparison)
+    baseline = aggregated["baseline"]
+    perturbation = aggregated["perturbation"]
+    differences = aggregated["differences"]
+    n_unique_examples = aggregated["n_unique_examples"]
+    n_raw_pairs = aggregated["n_raw_pairs"]
     mean_difference = mean_or_none(differences)
     effect_size_dz = paired_effect_size_dz(differences)
-    mde_effect_size_dz = paired_mde_effect_size_dz(len(differences))
+    mde_effect_size_dz = paired_mde_effect_size_dz(n_unique_examples)
     mde_mean_difference = scale_effect_size_to_mean_difference(mde_effect_size_dz, differences)
     return {
         "tested_quantity": "difference_vs_zero",
         "alternative": "two_sided",
-        "n_pairs": len(differences),
+        "aggregation_method": "mean_difference_per_example",
+        "n_pairs": n_unique_examples,
+        "n_unique_examples": n_unique_examples,
+        "n_raw_pairs": n_raw_pairs,
         "mean_difference": mean_difference,
         "mde_mean_difference": mde_mean_difference,
         "effect_size_dz": effect_size_dz,
@@ -113,6 +119,51 @@ def build_stat_test_block(group_comparison: dict[str, list[float]]) -> dict[str,
                 "p_value": paired_t_test(baseline, perturbation),
             },
         },
+    }
+
+
+def aggregate_comparison_by_example(group_comparison: dict[str, object]) -> dict[str, object]:
+    pairs_by_example = group_comparison.get("pairs_by_example", {})
+    if not pairs_by_example:
+        baseline = [float(value) for value in group_comparison.get("baseline", [])]
+        perturbation = [float(value) for value in group_comparison.get("perturbation", [])]
+        differences = [float(value) for value in group_comparison.get("differences", [])]
+        unique_example_ids = set(group_comparison.get("example_ids", []))
+        if not unique_example_ids and differences:
+            unique_example_ids = {str(index) for index, _value in enumerate(differences)}
+        return {
+            "baseline": baseline,
+            "perturbation": perturbation,
+            "differences": differences,
+            "n_unique_examples": len(unique_example_ids) if unique_example_ids else len(differences),
+            "n_raw_pairs": len(differences),
+        }
+
+    baseline_values: list[float] = []
+    perturbation_values: list[float] = []
+    difference_values: list[float] = []
+    for example_id in sorted(pairs_by_example):
+        example_pairs = pairs_by_example[example_id]
+        baseline_scores = [float(value) for value in example_pairs.get("baseline", [])]
+        perturbation_scores = [float(value) for value in example_pairs.get("perturbation", [])]
+        difference_scores = [float(value) for value in example_pairs.get("differences", [])]
+        if not difference_scores:
+            continue
+        baseline_mean = mean_or_none(baseline_scores)
+        perturbation_mean = mean_or_none(perturbation_scores)
+        difference_mean = mean_or_none(difference_scores)
+        if baseline_mean is None or perturbation_mean is None or difference_mean is None:
+            continue
+        baseline_values.append(baseline_mean)
+        perturbation_values.append(perturbation_mean)
+        difference_values.append(difference_mean)
+
+    return {
+        "baseline": baseline_values,
+        "perturbation": perturbation_values,
+        "differences": difference_values,
+        "n_unique_examples": len(difference_values),
+        "n_raw_pairs": len(group_comparison.get("differences", [])),
     }
 
 

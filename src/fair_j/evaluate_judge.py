@@ -5,11 +5,16 @@ from pathlib import Path
 from fair_j.io_utils import read_run_artifacts, write_json
 from fair_j.schemas import CoreOutput, ScoreLogRow
 from fair_j.score_grouping import (
+    DELETIONS_GROUP,
+    PARAPHRASES_ALL_GROUP,
+    PARAPHRASES_CROSS_CRITERION_GROUP,
+    PARAPHRASES_SAME_CRITERION_GROUP,
     collect_grouped_comparisons,
     collect_grouped_rank_metrics,
     compute_dataset_level_means,
     empty_group_comparison,
     group_scores_by_condition,
+    parse_perturbation,
 )
 from fair_j.stats_utils import (
     bias_to_mae_ratio,
@@ -58,15 +63,25 @@ def compute_dataset_level_scores(
     results: dict[str, object] = {}
 
     for criterion_id in criterion_ids:
-        paraphrase_comparison = grouped_comparisons.get(criterion_id, {}).get(
-            "paraphrases",
+        paraphrase_all_comparison = grouped_comparisons.get(criterion_id, {}).get(
+            PARAPHRASES_ALL_GROUP,
+            empty_group_comparison(),
+        )
+        paraphrase_same_comparison = grouped_comparisons.get(criterion_id, {}).get(
+            PARAPHRASES_SAME_CRITERION_GROUP,
+            empty_group_comparison(),
+        )
+        paraphrase_cross_comparison = grouped_comparisons.get(criterion_id, {}).get(
+            PARAPHRASES_CROSS_CRITERION_GROUP,
             empty_group_comparison(),
         )
         deletion_comparison = grouped_comparisons.get(criterion_id, {}).get(
-            "deletions",
+            DELETIONS_GROUP,
             empty_group_comparison(),
         )
-        paraphrase_diffs = paraphrase_comparison["differences"]
+        paraphrase_all_diffs = paraphrase_all_comparison["differences"]
+        paraphrase_same_diffs = paraphrase_same_comparison["differences"]
+        paraphrase_cross_diffs = paraphrase_cross_comparison["differences"]
         deletion_diffs = deletion_comparison["differences"]
         criterion_means = dataset_level_means.get(criterion_id, {})
         baseline_scores = collect_baseline_scores(score_rows, criterion_id)
@@ -80,17 +95,61 @@ def compute_dataset_level_scores(
             "std_seed_default": compute_std_seed_default(criterion_means),
             "std_perturbations": compute_std_perturbations(criterion_means),
             "std_paraphrases": compute_std_for_group(criterion_means, "paraphrases"),
+            "std_paraphrases_all": compute_std_for_group(criterion_means, "paraphrases"),
+            "std_paraphrases_same_criterion": compute_std_for_paraphrase_scope(
+                criterion_means,
+                criterion_id,
+                PARAPHRASES_SAME_CRITERION_GROUP,
+            ),
+            "std_paraphrases_cross_criterion": compute_std_for_paraphrase_scope(
+                criterion_means,
+                criterion_id,
+                PARAPHRASES_CROSS_CRITERION_GROUP,
+            ),
             "std_deletions": compute_std_for_group(criterion_means, "deletions"),
             "std_total": compute_std_total(criterion_means),
-            "bias_paraphrases": mean_or_none(paraphrase_diffs),
-            "bias_to_mae_ratio_paraphrases": bias_to_mae_ratio(paraphrase_diffs),
+            "bias_paraphrases": mean_or_none(paraphrase_all_diffs),
+            "bias_paraphrases_all": mean_or_none(paraphrase_all_diffs),
+            "bias_paraphrases_same_criterion": mean_or_none(paraphrase_same_diffs),
+            "bias_paraphrases_cross_criterion": mean_or_none(paraphrase_cross_diffs),
+            "bias_to_mae_ratio_paraphrases": bias_to_mae_ratio(paraphrase_all_diffs),
+            "bias_to_mae_ratio_paraphrases_all": bias_to_mae_ratio(paraphrase_all_diffs),
+            "bias_to_mae_ratio_paraphrases_same_criterion": bias_to_mae_ratio(paraphrase_same_diffs),
+            "bias_to_mae_ratio_paraphrases_cross_criterion": bias_to_mae_ratio(paraphrase_cross_diffs),
             "bias_paraphrases_scale_normalized": normalize_by_scale(
-                mean_or_none(paraphrase_diffs),
+                mean_or_none(paraphrase_all_diffs),
                 criterion_score_scale_span,
             ),
-            "mad_paraphrases": mean_absolute_or_none(paraphrase_diffs),
+            "bias_paraphrases_all_scale_normalized": normalize_by_scale(
+                mean_or_none(paraphrase_all_diffs),
+                criterion_score_scale_span,
+            ),
+            "bias_paraphrases_same_criterion_scale_normalized": normalize_by_scale(
+                mean_or_none(paraphrase_same_diffs),
+                criterion_score_scale_span,
+            ),
+            "bias_paraphrases_cross_criterion_scale_normalized": normalize_by_scale(
+                mean_or_none(paraphrase_cross_diffs),
+                criterion_score_scale_span,
+            ),
+            "mad_paraphrases": mean_absolute_or_none(paraphrase_all_diffs),
+            "mad_paraphrases_all": mean_absolute_or_none(paraphrase_all_diffs),
+            "mad_paraphrases_same_criterion": mean_absolute_or_none(paraphrase_same_diffs),
+            "mad_paraphrases_cross_criterion": mean_absolute_or_none(paraphrase_cross_diffs),
             "mad_paraphrases_scale_normalized": normalize_by_scale(
-                mean_absolute_or_none(paraphrase_diffs),
+                mean_absolute_or_none(paraphrase_all_diffs),
+                criterion_score_scale_span,
+            ),
+            "mad_paraphrases_all_scale_normalized": normalize_by_scale(
+                mean_absolute_or_none(paraphrase_all_diffs),
+                criterion_score_scale_span,
+            ),
+            "mad_paraphrases_same_criterion_scale_normalized": normalize_by_scale(
+                mean_absolute_or_none(paraphrase_same_diffs),
+                criterion_score_scale_span,
+            ),
+            "mad_paraphrases_cross_criterion_scale_normalized": normalize_by_scale(
+                mean_absolute_or_none(paraphrase_cross_diffs),
                 criterion_score_scale_span,
             ),
             "bias_deletions": mean_or_none(deletion_diffs),
@@ -106,7 +165,14 @@ def compute_dataset_level_scores(
             ),
             "score_scale_span": criterion_score_scale_span,
             "stat_tests": {
-                "paraphrases_vs_baseline": build_stat_test_block(paraphrase_comparison),
+                "paraphrases_vs_baseline": build_stat_test_block(paraphrase_all_comparison),
+                "paraphrases_all_vs_baseline": build_stat_test_block(paraphrase_all_comparison),
+                "paraphrases_same_criterion_vs_baseline": build_stat_test_block(
+                    paraphrase_same_comparison
+                ),
+                "paraphrases_cross_criterion_vs_baseline": build_stat_test_block(
+                    paraphrase_cross_comparison
+                ),
                 "deletions_vs_baseline": build_stat_test_block(deletion_comparison),
             },
         }
@@ -163,6 +229,25 @@ def compute_ranking_consistency(score_rows: list[ScoreLogRow]) -> dict[str, obje
         }
 
     return results
+
+
+def compute_std_for_paraphrase_scope(
+    criterion_means: dict[str, dict[int, float]],
+    criterion_id: str,
+    scope: str,
+) -> float | None:
+    values: list[float] = []
+    for perturbation, perturbation_scores in criterion_means.items():
+        parsed = parse_perturbation(perturbation)
+        if parsed["kind"] != "paraphrase":
+            continue
+        target_criterion_id = parsed["criterion_id"]
+        if scope == PARAPHRASES_SAME_CRITERION_GROUP and target_criterion_id != criterion_id:
+            continue
+        if scope == PARAPHRASES_CROSS_CRITERION_GROUP and target_criterion_id == criterion_id:
+            continue
+        values.extend(perturbation_scores.values())
+    return raw_std(values)
 
 
 def compute_pooled_gamma(
