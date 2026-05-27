@@ -17,4 +17,4 @@ One-line guide to each file:
 - `io_utils.py` - JSON/JSONL/dataset I/O plus run-directory helpers.
 - `score_grouping.py` - grouping helpers for baseline-vs-perturbation comparisons and ranking metrics.
 - `stats_utils.py` - statistical utilities used by the evaluation stage.
-- `report_html.py` - HTML report generation for single-run and multi-run comparison views.
+- `report_html.py` - static HTML report generation from precomputed `core_output.json` files.

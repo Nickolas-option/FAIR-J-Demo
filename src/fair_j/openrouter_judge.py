@@ -57,11 +57,14 @@ def build_judge_response_format(expected_ids: set[str]) -> dict[str, object]:
 
 
 def build_openrouter_provider_preferences(adapter_input: AdapterInput) -> dict[str, object] | None:
-    provider: dict[str, object] = {}
+    provider: dict[str, object] = {
+        # OpenRouter structured-output docs recommend requiring providers
+        # that support the requested parameters when using json_schema.
+        "require_parameters": True,
+    }
     if adapter_input.provider_only:
         provider["only"] = [adapter_input.provider_only]
         provider["allow_fallbacks"] = False
-        provider["require_parameters"] = True
     if adapter_input.provider_quantization:
         provider["quantizations"] = [adapter_input.provider_quantization]
     return provider or None
@@ -73,7 +76,10 @@ def build_openrouter_extra_body(adapter_input: AdapterInput) -> dict[str, object
             "enabled": False,
             "effort": "none",
             "exclude": True,
-        }
+        },
+        # OpenRouter Response Healing repairs malformed JSON for non-streaming
+        # structured-output requests before our parser sees the content.
+        "plugins": [{"id": "response-healing"}],
     }
     provider = build_openrouter_provider_preferences(adapter_input)
     if provider is not None:
