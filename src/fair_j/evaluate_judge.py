@@ -194,8 +194,9 @@ def compute_ranking_consistency(score_rows: list[ScoreLogRow]) -> dict[str, obje
     results: dict[str, object] = {}
 
     for criterion_id in criterion_ids:
-        rank_metrics = collect_grouped_rank_metrics(grouped_scores[criterion_id])
+        rank_metrics = collect_grouped_rank_metrics(grouped_scores[criterion_id], criterion_id)
         paraphrases = rank_metrics.get("paraphrases", {})
+        paraphrases_same_criterion = rank_metrics.get("paraphrases_same_criterion", {})
         deletions = rank_metrics.get("deletions", {})
         results[criterion_id] = {
             "kendall_paraphrases_mean": mean_or_none(paraphrases.get("tau_b", [])),
@@ -204,6 +205,15 @@ def compute_ranking_consistency(score_rows: list[ScoreLogRow]) -> dict[str, obje
             "kendall_paraphrases_max": max_or_none(paraphrases.get("tau_b", [])),
             "concordant_paraphrases_pooled": pooled_pair_count(paraphrases, "concordant_pairs"),
             "discordant_paraphrases_pooled": pooled_pair_count(paraphrases, "discordant_pairs"),
+            "kendall_paraphrases_same_criterion_mean": mean_or_none(
+                paraphrases_same_criterion.get("tau_b", [])
+            ),
+            "concordant_paraphrases_same_criterion_pooled": pooled_pair_count(
+                paraphrases_same_criterion, "concordant_pairs"
+            ),
+            "discordant_paraphrases_same_criterion_pooled": pooled_pair_count(
+                paraphrases_same_criterion, "discordant_pairs"
+            ),
             "kendall_deletions_mean": mean_or_none(deletions.get("tau_b", [])),
             "kendall_deletions_std": raw_std(deletions.get("tau_b", [])),
             "kendall_deletions_min": min_or_none(deletions.get("tau_b", [])),
@@ -222,6 +232,9 @@ def compute_ranking_consistency(score_rows: list[ScoreLogRow]) -> dict[str, obje
             "tie_pct_paraphrases_std": raw_std(paraphrases.get("tie_pct", [])),
             "tie_pct_paraphrases_min": min_or_none(paraphrases.get("tie_pct", [])),
             "tie_pct_paraphrases_max": max_or_none(paraphrases.get("tie_pct", [])),
+            "tie_pct_paraphrases_same_criterion_mean": mean_or_none(
+                paraphrases_same_criterion.get("tie_pct", [])
+            ),
             "tie_pct_deletions_mean": mean_or_none(deletions.get("tie_pct", [])),
             "tie_pct_deletions_std": raw_std(deletions.get("tie_pct", [])),
             "tie_pct_deletions_min": min_or_none(deletions.get("tie_pct", [])),

@@ -1,0 +1,736 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title }}</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f8fafc;
+      --panel: #ffffff;
+      --ink: #0f172a;
+      --muted: #475569;
+      --line: #cbd5e1;
+      --accent: #0284c7;
+      --accent-soft: #e0f2fe;
+      --bad: #dc2626;
+      --warn: #d97706;
+      --good: #16a34a;
+      --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+      --radius: 12px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+      --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.5;
+    }
+    main {
+      width: min(1400px, calc(100vw - 32px));
+      margin: 32px auto 64px;
+    }
+    .hero {
+      background: linear-gradient(135deg, #0f172a, #1e293b);
+      color: white;
+      padding: 24px 32px;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      margin-bottom: 24px;
+    }
+    .hero h1 {
+      margin: 0 0 8px;
+      font-size: 28px;
+    }
+    .hero p {
+      margin: 0;
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 16px;
+      max-width: 1000px;
+    }
+    .report-page {
+      display: none;
+    }
+    .report-page.is-active {
+      display: block;
+    }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    button {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 8px 16px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    button:hover {
+      background: #f1f5f9;
+    }
+    .summary-grid,
+    .group-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .summary-card,
+    .group-card,
+    details.section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .summary-card {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+    }
+    .summary-card h2 {
+      margin: 0 0 12px;
+      font-size: 20px;
+    }
+    .summary-verdict {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .summary-reason {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.4;
+    }
+    .stat-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+      margin-top: auto;
+      border-top: 1px solid var(--line);
+      padding-top: 16px;
+    }
+    .context-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .context-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 18px;
+    }
+    .context-card h3 {
+      margin: 0 0 14px;
+      font-size: 18px;
+    }
+    .context-card dl {
+      margin: 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 10px;
+    }
+    .context-card dt {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      margin: 0 0 2px;
+    }
+    .context-card dd {
+      margin: 0;
+      color: var(--ink);
+      word-break: break-word;
+    }
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+    }
+    .stat-item .label {
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+    .stat-item .value {
+      font-family: var(--mono);
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--ink);
+      margin-top: 4px;
+    }
+    .calculator-card {
+      margin-bottom: 24px;
+      border-color: #bae6fd;
+      background: #f0f9ff;
+    }
+    .calculator-card h3 {
+      margin: 0 0 8px;
+      color: #0369a1;
+      font-size: 18px;
+    }
+    .calculator-card p {
+      margin: 0 0 16px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .calculator-input-row {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .calculator-input-row label {
+      font-weight: 600;
+      color: #0f172a;
+      font-size: 14px;
+    }
+    .calculator-input-row input,
+    select {
+      padding: 8px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--line);
+      font-size: 14px;
+      background: #fff;
+      min-width: 160px;
+    }
+    .calculator-results {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 16px;
+    }
+    .calc-result-card {
+      background: white;
+      padding: 12px 16px;
+      border-radius: 8px;
+      border: 1px solid #ccfbf1;
+      font-size: 14px;
+      min-width: 180px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+    .calc-model {
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .calc-noise {
+      color: #0284c7;
+      font-size: 18px;
+      font-family: var(--mono);
+    }
+    details.section {
+      margin-bottom: 16px;
+      overflow: hidden;
+    }
+    details.section > summary {
+      cursor: pointer;
+      padding: 20px;
+      font-size: 20px;
+      font-weight: 600;
+      background: #f8fafc;
+      list-style: none;
+    }
+    details.section > summary::-webkit-details-marker {
+      display: none;
+    }
+    details.section[open] > summary {
+      border-bottom: 1px solid var(--line);
+    }
+    .section-body {
+      padding: 20px;
+    }
+    .section-explainer {
+      color: var(--muted);
+      margin-top: 0;
+      margin-bottom: 16px;
+      font-size: 14px;
+    }
+    .group-card {
+      padding: 18px;
+    }
+    .group-card h4 {
+      margin: 0 0 12px;
+      font-size: 16px;
+    }
+    .methodology-card {
+      margin-bottom: 24px;
+      padding: 20px;
+    }
+    .methodology-card h3 {
+      margin: 0 0 8px;
+      font-size: 18px;
+    }
+    .methodology-card p {
+      margin: 0 0 16px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .table-wrap {
+      overflow-x: auto;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 14px;
+    }
+    th,
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--line);
+    }
+    th {
+      background: #f1f5f9;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .value {
+      font-family: var(--mono);
+    }
+    .control-row {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 16px;
+      align-items: flex-end;
+      flex-wrap: wrap;
+    }
+    .control-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .control-field label {
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .stat-scope {
+      display: none;
+    }
+    .stat-scope.is-active {
+      display: block;
+    }
+    .good {
+      color: var(--good);
+      font-weight: 700;
+    }
+    .bad {
+      color: var(--bad);
+      font-weight: 700;
+    }
+    .warn {
+      color: var(--warn);
+      font-weight: 700;
+    }
+    .muted {
+      color: var(--muted);
+    }
+    .help-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      position: relative;
+    }
+    .help-label[data-help] {
+      cursor: help;
+    }
+    .help-label[data-help] .help-text {
+      border-bottom: 1px dotted var(--muted);
+    }
+    .help-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px;
+      height: 16px;
+      border-radius: 999px;
+      background: #eef2f7;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .app-tooltip {
+      position: fixed;
+      z-index: 9999;
+      max-width: 320px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: rgba(15, 23, 42, 0.96);
+      color: white;
+      font-size: 12px;
+      line-height: 1.45;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+      pointer-events: none;
+      opacity: 0;
+      transform: translateY(4px);
+      transition: opacity 120ms ease, transform 120ms ease;
+    }
+    .app-tooltip.is-visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .page-nav {
+      display: flex;
+      justify-content: center;
+      margin-top: 24px;
+    }
+    .page-toggle {
+      min-width: 56px;
+      font-size: 20px;
+      line-height: 1;
+      padding: 10px 16px;
+    }
+    @media (max-width: 720px) {
+      main {
+        width: min(100vw - 20px, 1400px);
+        margin: 20px auto 40px;
+      }
+      .hero {
+        padding: 18px;
+      }
+      .hero h1 {
+        font-size: 24px;
+      }
+      details.section > summary,
+      .section-body,
+      .summary-card,
+      .group-card {
+        padding: 16px;
+      }
+      th,
+      td {
+        padding: 10px 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  {% macro help_label(text, help_text=None) -%}
+    <span class="help-label"{% if help_text %} data-help="{{ help_text }}" tabindex="0" aria-label="{{ help_text }}"{% endif %}>
+      <span class="help-text">{{ text }}</span>
+      {% if help_text %}<span class="help-icon">i</span>{% endif %}
+    </span>
+  {%- endmacro %}
+  <main>
+    <section class="hero">
+      <h1>{{ title }}</h1>
+    </section>
+
+    <section class="report-page is-active" data-page="overview">
+      <section class="controls">
+        <button type="button" data-open-all="section">{{ controls.open_all_label }}</button>
+        <button type="button" data-close-all="section">{{ controls.close_all_label }}</button>
+      </section>
+
+      <section>
+        <div class="context-grid">
+          {% for card in run_context.cards %}
+          <article class="context-card">
+            <h3>{{ card.label }}</h3>
+            <dl>
+              {% for label, value in card.rows %}
+              <div>
+                <dt>{{ label }}</dt>
+                <dd>{{ value }}</dd>
+              </div>
+              {% endfor %}
+            </dl>
+          </article>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="summary-grid">
+        {% for card in summary_cards %}
+        <article class="summary-card">
+          <h2>{{ card.label }}</h2>
+          <div class="summary-verdict {{ card.verdict_class }}" title="{{ card.reason }}">{{ card.verdict }}</div>
+          <div class="stat-list">
+            {% for stat in card.stats %}
+            <div class="stat-item">
+              <div class="label">{{ help_label(stat.label, stat.help_text) }}</div>
+              <div class="value">{{ stat.value }}</div>
+            </div>
+            {% endfor %}
+          </div>
+        </article>
+        {% endfor %}
+      </section>
+
+      <section class="summary-card calculator-card">
+        <div>
+          <h3>{{ dataset_calculator.title }}</h3>
+          <p>{{ dataset_calculator.description }}</p>
+          <div class="calculator-input-row">
+            <label for="calc-n">{{ dataset_calculator.input_label }}</label>
+            <input type="number" id="calc-n" value="{{ dataset_calculator.default_value }}" min="1">
+          </div>
+        </div>
+        <div id="calc-results" class="calculator-results"></div>
+      </section>
+
+      <section class="group-card methodology-card">
+        <h3>{{ methodology.title }}</h3>
+        <p>{{ methodology.description }}</p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Metric</th>
+                <th>Meaning</th>
+                <th>Formula</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in methodology.rows %}
+              <tr>
+                <td>{{ row.label }}</td>
+                <td>{{ row.meaning }}</td>
+                <td class="value">{{ row.formula }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {% for overview in [dataset_overview, ranking_overview] %}
+      <details class="section" open>
+        <summary>{{ help_label(overview.title, overview.help_text) }}</summary>
+        <div class="section-body">
+          <div class="group-grid">
+            {% for group in overview.groups %}
+            <section class="group-card">
+              <h4>{{ group.title }}</h4>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Metric</th>
+                      {% for header in group.table.headers %}
+                      <th>{{ header }}</th>
+                      {% endfor %}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for row in group.table.rows %}
+                    <tr>
+                      <td>{{ help_label(row.label.text, row.label.help_text) }}</td>
+                      {% for cell in row.cells %}
+                      <td class="value {% if cell.css_class %}{{ cell.css_class }}{% endif %}">{{ cell.display }}</td>
+                      {% endfor %}
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+            {% endfor %}
+          </div>
+        </div>
+      </details>
+      {% endfor %}
+
+      <details class="section">
+        <summary>{{ stat_explorer.title }}</summary>
+        <div class="section-body">
+          <div class="control-row">
+            <div class="control-field">
+              <label for="stat-combined-select">{{ stat_explorer.select_label }}</label>
+              <select id="stat-combined-select" data-stat-combined-select>
+                {% for option in stat_explorer.options %}
+                <option value="{{ option.value }}">{{ option.label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          {% for scope in stat_explorer.scopes %}
+          <div class="stat-scope{% if scope.is_active %} is-active{% endif %}" data-stat-scope="{{ scope.value }}">
+            <div class="group-grid">
+              {% for group in scope.groups %}
+              <section class="group-card">
+                <h4>{{ group.title }}</h4>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Metric</th>
+                        {% for header in group.table.headers %}
+                        <th>{{ header }}</th>
+                        {% endfor %}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for row in group.table.rows %}
+                      <tr>
+                        <td>{{ help_label(row.label.text, row.label.help_text) }}</td>
+                        {% for cell in row.cells %}
+                        <td class="value {% if cell.css_class %}{{ cell.css_class }}{% endif %}">{{ cell.display }}</td>
+                        {% endfor %}
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+              {% endfor %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </details>
+
+      <div class="page-nav">
+        <button type="button" class="page-toggle" data-page-target="criteria" aria-label="Open criteria page">→</button>
+      </div>
+    </section>
+
+    <section class="report-page" data-page="criteria">
+      {% for section in criterion_sections %}
+      <details class="section">
+        <summary>{{ section.title }}</summary>
+        <div class="section-body">
+          <div class="group-grid">
+            {% for group in section.groups %}
+            <section class="group-card">
+              <h4>{{ group.title }}</h4>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Metric</th>
+                      {% for header in group.table.headers %}
+                      <th>{{ header }}</th>
+                      {% endfor %}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for row in group.table.rows %}
+                    <tr>
+                      <td>{{ help_label(row.label.text, row.label.help_text) }}</td>
+                      {% for cell in row.cells %}
+                      <td class="value {% if cell.css_class %}{{ cell.css_class }}{% endif %}">{{ cell.display }}</td>
+                      {% endfor %}
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+            {% endfor %}
+          </div>
+        </div>
+      </details>
+      {% endfor %}
+
+      <div class="page-nav">
+        <button type="button" class="page-toggle" data-page-target="overview" aria-label="Back to overview">←</button>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    window.__FAIR_J_CALC__ = {{ scripts.calc_data_json | safe }};
+    function setOpen(selector, openState) { document.querySelectorAll(selector).forEach(function(el) { el.open = openState; }); }
+    document.querySelector('[data-open-all="section"]').addEventListener('click', function() { setOpen('details.section', true); });
+    document.querySelector('[data-close-all="section"]').addEventListener('click', function() { setOpen('details.section', false); });
+    function showPage(pageName) {
+      document.querySelectorAll('[data-page]').forEach(function(node) {
+        node.classList.toggle('is-active', node.dataset.page === pageName);
+      });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    document.querySelectorAll('[data-page-target]').forEach(function(button) {
+      button.addEventListener('click', function() { showPage(button.dataset.pageTarget); });
+    });
+    var statSelect = document.querySelector('[data-stat-combined-select]');
+    if (statSelect) {
+      statSelect.addEventListener('change', function(event) {
+        document.querySelectorAll('.stat-scope').forEach(function(node) {
+          node.classList.toggle('is-active', node.dataset.statScope === event.target.value);
+        });
+      });
+    }
+    function updateCalc() {
+      var input = document.getElementById('calc-n');
+      var target = document.getElementById('calc-results');
+      if (!input || !target) { return; }
+      var n = Math.max(1, parseInt(input.value || '1', 10) || 1);
+      var htmlParts = [];
+      Object.keys(window.__FAIR_J_CALC__).forEach(function(model) {
+        var std = window.__FAIR_J_CALC__[model];
+        var noise = (std / Math.sqrt(n)).toFixed(3);
+        htmlParts.push('<div class="calc-result-card"><div class="calc-model">' + model + '</div><strong class="calc-noise">±' + noise + '</strong></div>');
+      });
+      target.innerHTML = htmlParts.join('');
+    }
+    var calcInput = document.getElementById('calc-n');
+    if (calcInput) { calcInput.addEventListener('input', updateCalc); updateCalc(); }
+
+    var tooltip = document.createElement('div');
+    tooltip.className = 'app-tooltip';
+    document.body.appendChild(tooltip);
+
+    function hideTooltip() {
+      tooltip.classList.remove('is-visible');
+    }
+
+    function positionTooltip(target) {
+      var rect = target.getBoundingClientRect();
+      var top = rect.bottom + 10;
+      var left = rect.left + (rect.width / 2);
+      tooltip.style.top = top + 'px';
+      tooltip.style.left = left + 'px';
+      tooltip.style.transform = 'translate(-50%, 0)';
+      requestAnimationFrame(function() {
+        var tipRect = tooltip.getBoundingClientRect();
+        var clampedLeft = Math.min(
+          window.innerWidth - tipRect.width / 2 - 12,
+          Math.max(tipRect.width / 2 + 12, left)
+        );
+        var adjustedTop = top;
+        if (tipRect.bottom > window.innerHeight - 12) {
+          adjustedTop = rect.top - tipRect.height - 10;
+        }
+        tooltip.style.left = clampedLeft + 'px';
+        tooltip.style.top = Math.max(12, adjustedTop) + 'px';
+      });
+    }
+
+    function showTooltip(target) {
+      var text = target.getAttribute('data-help');
+      if (!text) { return; }
+      tooltip.textContent = text;
+      tooltip.classList.add('is-visible');
+      positionTooltip(target);
+    }
+
+    document.querySelectorAll('.help-label[data-help]').forEach(function(node) {
+      node.addEventListener('mouseenter', function() { showTooltip(node); });
+      node.addEventListener('mousemove', function() { positionTooltip(node); });
+      node.addEventListener('mouseleave', hideTooltip);
+      node.addEventListener('focus', function() { showTooltip(node); });
+      node.addEventListener('blur', hideTooltip);
+    });
+  </script>
+</body>
+</html>
