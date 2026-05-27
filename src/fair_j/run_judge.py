@@ -262,6 +262,7 @@ def run_pending_calls(
     total_calls: int,
 ) -> int:
     completed_futures = 0
+    failed_calls = 0
 
     with ThreadPoolExecutor(max_workers=workers) as executor:
         future_to_call = {}
@@ -280,9 +281,17 @@ def run_pending_calls(
             pending_call = future_to_call[future]
             try:
                 scores_and_output = future.result()
-            except Exception:
-                report_call_event("failed", pending_call)
-                raise
+            except Exception as error:
+                failed_calls += 1
+                error_name = type(error).__name__
+                error_message = " ".join(str(error).split())
+                sys.stderr.write(
+                    f"\n[skipped] {format_pending_call_label(pending_call)} "
+                    f"after exhausting retries: {error_name}: {error_message}\n"
+                )
+                sys.stderr.flush()
+                report_progress(progress_callback, initial_completed + completed_futures + failed_calls, total_calls)
+                continue
 
             completed_futures += 1
             write_completed_call(

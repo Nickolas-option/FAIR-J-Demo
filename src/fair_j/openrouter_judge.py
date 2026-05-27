@@ -178,8 +178,7 @@ def call_bedrock_judge(
             last_error = error
             report_retry_error("bedrock", attempt, BEDROCK_JUDGE_MAX_RETRIES, error)
             if attempt < BEDROCK_JUDGE_MAX_RETRIES:
-                is_throttle = type(error).__name__ in ("ThrottlingException", "TooManyRequestsException")
-                time.sleep(30 * attempt if is_throttle else 2 ** attempt)
+                time.sleep(2 ** attempt)
 
     raise RuntimeError(
         f"Bedrock judge call failed after {BEDROCK_JUDGE_MAX_RETRIES} attempts."
@@ -357,7 +356,7 @@ def validate_openrouter_scores(
     return scores
 
 
-BEDROCK_JUDGE_MAX_RETRIES = 5
+BEDROCK_JUDGE_MAX_RETRIES = 8
 
 _MARKDOWN_FENCE_RE = re.compile(r"^```(?:json)?\s*\n?(.*?)\n?```\s*$", re.DOTALL)
 
