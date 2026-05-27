@@ -166,16 +166,20 @@ def append_group_comparison(
 
 def collect_grouped_rank_metrics(
     criterion_scores: dict[str, dict[int, dict[str, float]]],
+    criterion_id: str,
 ) -> dict[str, dict[str, list[float]]]:
     baseline_by_seed = criterion_scores.get("baseline", {})
     grouped_metrics: dict[str, dict[str, list[float]]] = {
         PARAPHRASES_GROUP: empty_group_rank_metrics(),
+        PARAPHRASES_ALL_GROUP: empty_group_rank_metrics(),
+        PARAPHRASES_SAME_CRITERION_GROUP: empty_group_rank_metrics(),
+        PARAPHRASES_CROSS_CRITERION_GROUP: empty_group_rank_metrics(),
         DELETIONS_GROUP: empty_group_rank_metrics(),
     }
 
     for perturbation, perturbation_by_seed in criterion_scores.items():
-        group_name = perturbation_group_name(perturbation)
-        if group_name is None:
+        group_names = rank_metric_group_names(perturbation, criterion_id)
+        if not group_names:
             continue
 
         for seed, perturbation_scores in perturbation_by_seed.items():
@@ -193,15 +197,30 @@ def collect_grouped_rank_metrics(
                 for example_id in shared_example_ids
             ]
             pair_counts = count_pair_relationships(baseline_values, perturbation_values)
-            grouped_metrics[group_name]["tie_pct"].append(pair_counts["tie_pct"])
-            grouped_metrics[group_name]["concordant_pairs"].append(pair_counts["concordant_pairs"])
-            grouped_metrics[group_name]["discordant_pairs"].append(pair_counts["discordant_pairs"])
             result = kendalltau(baseline_values, perturbation_values)
             tau = float(result.statistic)
-            if tau == tau:
-                grouped_metrics[group_name]["tau_b"].append(tau)
+            for group_name in group_names:
+                grouped_metrics[group_name]["tie_pct"].append(pair_counts["tie_pct"])
+                grouped_metrics[group_name]["concordant_pairs"].append(pair_counts["concordant_pairs"])
+                grouped_metrics[group_name]["discordant_pairs"].append(pair_counts["discordant_pairs"])
+                if tau == tau:
+                    grouped_metrics[group_name]["tau_b"].append(tau)
 
     return grouped_metrics
+
+
+def rank_metric_group_names(perturbation: str, criterion_id: str) -> list[str]:
+    parsed = parse_perturbation(perturbation)
+    if parsed["kind"] == "paraphrase":
+        group_names = [PARAPHRASES_GROUP, PARAPHRASES_ALL_GROUP]
+        if parsed["criterion_id"] == criterion_id:
+            group_names.append(PARAPHRASES_SAME_CRITERION_GROUP)
+        else:
+            group_names.append(PARAPHRASES_CROSS_CRITERION_GROUP)
+        return group_names
+    if parsed["kind"] == "deletion":
+        return [DELETIONS_GROUP]
+    return []
 
 
 def empty_group_rank_metrics() -> dict[str, list[float]]:
