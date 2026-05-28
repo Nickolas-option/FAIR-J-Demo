@@ -624,6 +624,43 @@
             </dl>
           </article>
           
+          <article class="context-card">
+            <h3>Claude Opus 4.7</h3>
+            <dl>
+              
+              <div>
+                <dt>Judge model</dt>
+                <dd>bedrock/claude-opus-4-7</dd>
+              </div>
+              
+              <div>
+                <dt>Paraphrase model</dt>
+                <dd>bedrock/claude-sonnet-4-6</dd>
+              </div>
+              
+              <div>
+                <dt>Examples used</dt>
+                <dd>-</dd>
+              </div>
+              
+              <div>
+                <dt>Paraphrases per criterion</dt>
+                <dd>5</dd>
+              </div>
+              
+              <div>
+                <dt>Repeated calls</dt>
+                <dd>1</dd>
+              </div>
+              
+              <div>
+                <dt>Score scale</dt>
+                <dd>1 - 3</dd>
+              </div>
+              
+            </dl>
+          </article>
+          
         </div>
       </section>
 
@@ -829,6 +866,46 @@
           </div>
         </article>
         
+        <article class="summary-card">
+          <h2>Claude Opus 4.7</h2>
+          <div class="summary-verdict warn" title="Usable, but one or more stability signals are only moderate.">Review</div>
+          <div class="stat-list">
+            
+            <div class="stat-item">
+              <div class="label"><span class="help-label" data-help="Estimated share of ranking pairs that flip when the same criterion is paraphrased." tabindex="0" aria-label="Estimated share of ranking pairs that flip when the same criterion is paraphrased.">
+      <span class="help-text">Flips</span>
+      <span class="help-icon">i</span>
+    </span></div>
+              <div class="value">0.1%</div>
+            </div>
+            
+            <div class="stat-item">
+              <div class="label"><span class="help-label" data-help="Mean absolute score shift when the same criterion is paraphrased, normalized by score scale span. Lower is better." tabindex="0" aria-label="Mean absolute score shift when the same criterion is paraphrased, normalized by score scale span. Lower is better.">
+      <span class="help-text">Score Stability</span>
+      <span class="help-icon">i</span>
+    </span></div>
+              <div class="value">0.0601</div>
+            </div>
+            
+            <div class="stat-item">
+              <div class="label"><span class="help-label" data-help="Average Kendall&#39;s tau-b between baseline ranking and same-criterion paraphrased ranking. Higher is better." tabindex="0" aria-label="Average Kendall&#39;s tau-b between baseline ranking and same-criterion paraphrased ranking. Higher is better.">
+      <span class="help-text">Ranking Stability</span>
+      <span class="help-icon">i</span>
+    </span></div>
+              <div class="value">0.839</div>
+            </div>
+            
+            <div class="stat-item">
+              <div class="label"><span class="help-label" data-help="Cross-criterion normalized MAD divided by same-criterion normalized MAD. Lower means paraphrasing stays more isolated to the intended criterion." tabindex="0" aria-label="Cross-criterion normalized MAD divided by same-criterion normalized MAD. Lower means paraphrasing stays more isolated to the intended criterion.">
+      <span class="help-text">Spillover</span>
+      <span class="help-icon">i</span>
+    </span></div>
+              <div class="value">0.549</div>
+            </div>
+            
+          </div>
+        </article>
+        
       </section>
 
       <section class="summary-card calculator-card">
@@ -913,6 +990,8 @@
                       
                       <th>GPT OSS 120B</th>
                       
+                      <th>Claude Opus 4.7</th>
+                      
                     </tr>
                   </thead>
                   <tbody>
@@ -933,6 +1012,8 @@
                       
                       <td class="value ">0.1076</td>
                       
+                      <td class="value ">0.0601</td>
+                      
                     </tr>
                     
                     <tr>
@@ -950,6 +1031,8 @@
                       <td class="value ">0.5085</td>
                       
                       <td class="value ">0.7159</td>
+                      
+                      <td class="value ">0.5490</td>
                       
                     </tr>
                     
@@ -988,6 +1071,8 @@
                       
                       <th>GPT OSS 120B</th>
                       
+                      <th>Claude Opus 4.7</th>
+                      
                     </tr>
                   </thead>
                   <tbody>
@@ -1008,6 +1093,8 @@
                       
                       <td class="value ">1.2%</td>
                       
+                      <td class="value ">0.1%</td>
+                      
                     </tr>
                     
                     <tr>
@@ -1026,6 +1113,8 @@
                       
                       <td class="value ">0.672</td>
                       
+                      <td class="value ">0.839</td>
+                      
                     </tr>
                     
                     <tr>
@@ -1043,6 +1132,8 @@
                       <td class="value ">65.3%</td>
                       
                       <td class="value ">66.1%</td>
+                      
+                      <td class="value ">58.4%</td>
                       
                     </tr>
                     
@@ -1103,6 +1194,8 @@
                         
                         <th>GPT OSS 120B</th>
                         
+                        <th>Claude Opus 4.7</th>
+                        
                       </tr>
                     </thead>
                     <tbody>
@@ -1118,6 +1211,8 @@
                         <td class="value ">373</td>
                         
                         <td class="value ">374</td>
+                        
+                        <td class="value ">375</td>
                         
                         <td class="value ">375</td>
                         
@@ -1141,6 +1236,8 @@
                         
                         <td class="value ">-0.090</td>
                         
+                        <td class="value ">-0.099</td>
+                        
                       </tr>
                       
                       <tr>
@@ -1154,6 +1251,8 @@
                         <td class="value muted">0.122</td>
                         
                         <td class="value muted">0.268</td>
+                        
+                        <td class="value good">0.000</td>
                         
                         <td class="value good">0.000</td>
                         
@@ -1177,6 +1276,8 @@
                         
                         <td class="value good">0.000</td>
                         
+                        <td class="value good">0.000</td>
+                        
                       </tr>
                       
                       <tr>
@@ -1190,6 +1291,8 @@
                         <td class="value muted">0.120</td>
                         
                         <td class="value muted">0.238</td>
+                        
+                        <td class="value good">0.002</td>
                         
                         <td class="value good">0.002</td>
                         
@@ -1220,6 +1323,8 @@
                         
                         <th>GPT OSS 120B</th>
                         
+                        <th>Claude Opus 4.7</th>
+                        
                       </tr>
                     </thead>
                     <tbody>
@@ -1235,6 +1340,8 @@
                         <td class="value ">373</td>
                         
                         <td class="value ">374</td>
+                        
+                        <td class="value ">375</td>
                         
                         <td class="value ">375</td>
                         
@@ -1258,6 +1365,8 @@
                         
                         <td class="value ">-0.041</td>
                         
+                        <td class="value ">-0.074</td>
+                        
                       </tr>
                       
                       <tr>
@@ -1275,6 +1384,8 @@
                         <td class="value good">0.000</td>
                         
                         <td class="value good">0.036</td>
+                        
+                        <td class="value good">0.000</td>
                         
                       </tr>
                       
@@ -1294,6 +1405,8 @@
                         
                         <td class="value good">0.046</td>
                         
+                        <td class="value good">0.000</td>
+                        
                       </tr>
                       
                       <tr>
@@ -1311,6 +1424,8 @@
                         <td class="value good">0.002</td>
                         
                         <td class="value good">0.042</td>
+                        
+                        <td class="value good">0.002</td>
                         
                       </tr>
                       
@@ -1343,6 +1458,8 @@
                         
                         <th>GPT OSS 120B</th>
                         
+                        <th>Claude Opus 4.7</th>
+                        
                       </tr>
                     </thead>
                     <tbody>
@@ -1358,6 +1475,8 @@
                         <td class="value ">373</td>
                         
                         <td class="value ">374</td>
+                        
+                        <td class="value ">375</td>
                         
                         <td class="value ">375</td>
                         
@@ -1381,6 +1500,8 @@
                         
                         <td class="value ">-0.005</td>
                         
+                        <td class="value ">-0.009</td>
+                        
                       </tr>
                       
                       <tr>
@@ -1398,6 +1519,8 @@
                         <td class="value good">0.019</td>
                         
                         <td class="value muted">0.699</td>
+                        
+                        <td class="value muted">0.339</td>
                         
                       </tr>
                       
@@ -1417,6 +1540,8 @@
                         
                         <td class="value muted">0.416</td>
                         
+                        <td class="value muted">0.785</td>
+                        
                       </tr>
                       
                       <tr>
@@ -1434,6 +1559,8 @@
                         <td class="value good">0.014</td>
                         
                         <td class="value muted">0.693</td>
+                        
+                        <td class="value muted">0.330</td>
                         
                       </tr>
                       
@@ -1460,6 +1587,8 @@
                         
                         <th>GPT OSS 120B</th>
                         
+                        <th>Claude Opus 4.7</th>
+                        
                       </tr>
                     </thead>
                     <tbody>
@@ -1475,6 +1604,8 @@
                         <td class="value ">373</td>
                         
                         <td class="value ">374</td>
+                        
+                        <td class="value ">375</td>
                         
                         <td class="value ">375</td>
                         
@@ -1498,6 +1629,8 @@
                         
                         <td class="value ">1.18e-18</td>
                         
+                        <td class="value ">0.003</td>
+                        
                       </tr>
                       
                       <tr>
@@ -1515,6 +1648,8 @@
                         <td class="value muted">0.662</td>
                         
                         <td class="value muted">1.000</td>
+                        
+                        <td class="value muted">0.766</td>
                         
                       </tr>
                       
@@ -1534,6 +1669,8 @@
                         
                         <td class="value muted">0.904</td>
                         
+                        <td class="value muted">0.583</td>
+                        
                       </tr>
                       
                       <tr>
@@ -1551,6 +1688,8 @@
                         <td class="value muted">0.661</td>
                         
                         <td class="value muted">0.939</td>
+                        
+                        <td class="value muted">0.841</td>
                         
                       </tr>
                       
@@ -1583,6 +1722,8 @@
                         
                         <th>GPT OSS 120B</th>
                         
+                        <th>Claude Opus 4.7</th>
+                        
                       </tr>
                     </thead>
                     <tbody>
@@ -1598,6 +1739,8 @@
                         <td class="value ">373</td>
                         
                         <td class="value ">374</td>
+                        
+                        <td class="value ">375</td>
                         
                         <td class="value ">375</td>
                         
@@ -1621,6 +1764,8 @@
                         
                         <td class="value ">0.028</td>
                         
+                        <td class="value ">0.009</td>
+                        
                       </tr>
                       
                       <tr>
@@ -1638,6 +1783,8 @@
                         <td class="value good">0.002</td>
                         
                         <td class="value good">0.047</td>
+                        
+                        <td class="value muted">0.241</td>
                         
                       </tr>
                       
@@ -1657,6 +1804,8 @@
                         
                         <td class="value muted">0.142</td>
                         
+                        <td class="value muted">0.286</td>
+                        
                       </tr>
                       
                       <tr>
@@ -1674,6 +1823,8 @@
                         <td class="value good">0.002</td>
                         
                         <td class="value good">0.050</td>
+                        
+                        <td class="value muted">0.260</td>
                         
                       </tr>
                       
@@ -1700,6 +1851,8 @@
                         
                         <th>GPT OSS 120B</th>
                         
+                        <th>Claude Opus 4.7</th>
+                        
                       </tr>
                     </thead>
                     <tbody>
@@ -1715,6 +1868,8 @@
                         <td class="value ">373</td>
                         
                         <td class="value ">374</td>
+                        
+                        <td class="value ">375</td>
                         
                         <td class="value ">375</td>
                         
@@ -1738,6 +1893,8 @@
                         
                         <td class="value ">0.054</td>
                         
+                        <td class="value ">-0.003</td>
+                        
                       </tr>
                       
                       <tr>
@@ -1755,6 +1912,8 @@
                         <td class="value muted">0.189</td>
                         
                         <td class="value good">0.001</td>
+                        
+                        <td class="value muted">0.789</td>
                         
                       </tr>
                       
@@ -1774,6 +1933,8 @@
                         
                         <td class="value good">0.001</td>
                         
+                        <td class="value muted">0.819</td>
+                        
                       </tr>
                       
                       <tr>
@@ -1791,6 +1952,8 @@
                         <td class="value muted">0.230</td>
                         
                         <td class="value good">0.002</td>
+                        
+                        <td class="value muted">0.825</td>
                         
                       </tr>
                       
@@ -1823,6 +1986,8 @@
                         
                         <th>GPT OSS 120B</th>
                         
+                        <th>Claude Opus 4.7</th>
+                        
                       </tr>
                     </thead>
                     <tbody>
@@ -1838,6 +2003,8 @@
                         <td class="value ">373</td>
                         
                         <td class="value ">374</td>
+                        
+                        <td class="value ">375</td>
                         
                         <td class="value ">375</td>
                         
@@ -1861,6 +2028,8 @@
                         
                         <td class="value ">-0.005</td>
                         
+                        <td class="value ">0.008</td>
+                        
                       </tr>
                       
                       <tr>
@@ -1878,6 +2047,8 @@
                         <td class="value muted">0.089</td>
                         
                         <td class="value muted">0.744</td>
+                        
+                        <td class="value muted">0.459</td>
                         
                       </tr>
                       
@@ -1897,6 +2068,8 @@
                         
                         <td class="value muted">0.962</td>
                         
+                        <td class="value muted">0.602</td>
+                        
                       </tr>
                       
                       <tr>
@@ -1914,6 +2087,8 @@
                         <td class="value muted">0.102</td>
                         
                         <td class="value muted">0.783</td>
+                        
+                        <td class="value muted">0.478</td>
                         
                       </tr>
                       
@@ -1940,6 +2115,8 @@
                         
                         <th>GPT OSS 120B</th>
                         
+                        <th>Claude Opus 4.7</th>
+                        
                       </tr>
                     </thead>
                     <tbody>
@@ -1955,6 +2132,8 @@
                         <td class="value ">373</td>
                         
                         <td class="value ">374</td>
+                        
+                        <td class="value ">375</td>
                         
                         <td class="value ">375</td>
                         
@@ -1978,6 +2157,8 @@
                         
                         <td class="value ">-0.036</td>
                         
+                        <td class="value ">-0.025</td>
+                        
                       </tr>
                       
                       <tr>
@@ -1995,6 +2176,8 @@
                         <td class="value muted">0.114</td>
                         
                         <td class="value muted">0.064</td>
+                        
+                        <td class="value muted">0.060</td>
                         
                       </tr>
                       
@@ -2014,6 +2197,8 @@
                         
                         <td class="value muted">0.082</td>
                         
+                        <td class="value good">0.041</td>
+                        
                       </tr>
                       
                       <tr>
@@ -2031,6 +2216,8 @@
                         <td class="value muted">0.152</td>
                         
                         <td class="value muted">0.094</td>
+                        
+                        <td class="value muted">0.088</td>
                         
                       </tr>
                       
@@ -2063,6 +2250,8 @@
                         
                         <th>GPT OSS 120B</th>
                         
+                        <th>Claude Opus 4.7</th>
+                        
                       </tr>
                     </thead>
                     <tbody>
@@ -2078,6 +2267,8 @@
                         <td class="value ">373</td>
                         
                         <td class="value ">374</td>
+                        
+                        <td class="value ">375</td>
                         
                         <td class="value ">375</td>
                         
@@ -2101,6 +2292,8 @@
                         
                         <td class="value ">0.020</td>
                         
+                        <td class="value ">0.009</td>
+                        
                       </tr>
                       
                       <tr>
@@ -2118,6 +2311,8 @@
                         <td class="value muted">0.534</td>
                         
                         <td class="value muted">0.214</td>
+                        
+                        <td class="value muted">0.234</td>
                         
                       </tr>
                       
@@ -2137,6 +2332,8 @@
                         
                         <td class="value muted">0.179</td>
                         
+                        <td class="value muted">0.289</td>
+                        
                       </tr>
                       
                       <tr>
@@ -2154,6 +2351,8 @@
                         <td class="value muted">0.583</td>
                         
                         <td class="value muted">0.248</td>
+                        
+                        <td class="value muted">0.200</td>
                         
                       </tr>
                       
@@ -2180,6 +2379,8 @@
                         
                         <th>GPT OSS 120B</th>
                         
+                        <th>Claude Opus 4.7</th>
+                        
                       </tr>
                     </thead>
                     <tbody>
@@ -2195,6 +2396,8 @@
                         <td class="value ">373</td>
                         
                         <td class="value ">374</td>
+                        
+                        <td class="value ">375</td>
                         
                         <td class="value ">375</td>
                         
@@ -2218,6 +2421,8 @@
                         
                         <td class="value ">0.022</td>
                         
+                        <td class="value ">0.012</td>
+                        
                       </tr>
                       
                       <tr>
@@ -2235,6 +2440,8 @@
                         <td class="value muted">0.857</td>
                         
                         <td class="value muted">0.215</td>
+                        
+                        <td class="value muted">0.181</td>
                         
                       </tr>
                       
@@ -2254,6 +2461,8 @@
                         
                         <td class="value muted">0.239</td>
                         
+                        <td class="value muted">0.216</td>
+                        
                       </tr>
                       
                       <tr>
@@ -2271,6 +2480,8 @@
                         <td class="value muted">0.931</td>
                         
                         <td class="value muted">0.274</td>
+                        
+                        <td class="value muted">0.182</td>
                         
                       </tr>
                       
@@ -2303,6 +2514,8 @@
                         
                         <th>GPT OSS 120B</th>
                         
+                        <th>Claude Opus 4.7</th>
+                        
                       </tr>
                     </thead>
                     <tbody>
@@ -2318,6 +2531,8 @@
                         <td class="value ">373</td>
                         
                         <td class="value ">374</td>
+                        
+                        <td class="value ">375</td>
                         
                         <td class="value ">375</td>
                         
@@ -2341,6 +2556,8 @@
                         
                         <td class="value ">0.001</td>
                         
+                        <td class="value ">-0.009</td>
+                        
                       </tr>
                       
                       <tr>
@@ -2358,6 +2575,8 @@
                         <td class="value muted">0.527</td>
                         
                         <td class="value muted">0.882</td>
+                        
+                        <td class="value muted">0.230</td>
                         
                       </tr>
                       
@@ -2377,6 +2596,8 @@
                         
                         <td class="value muted">0.119</td>
                         
+                        <td class="value muted">0.123</td>
+                        
                       </tr>
                       
                       <tr>
@@ -2394,6 +2615,8 @@
                         <td class="value muted">0.533</td>
                         
                         <td class="value muted">0.907</td>
+                        
+                        <td class="value muted">0.262</td>
                         
                       </tr>
                       
@@ -2420,6 +2643,8 @@
                         
                         <th>GPT OSS 120B</th>
                         
+                        <th>Claude Opus 4.7</th>
+                        
                       </tr>
                     </thead>
                     <tbody>
@@ -2435,6 +2660,8 @@
                         <td class="value ">373</td>
                         
                         <td class="value ">374</td>
+                        
+                        <td class="value ">375</td>
                         
                         <td class="value ">375</td>
                         
@@ -2458,6 +2685,8 @@
                         
                         <td class="value ">0.002</td>
                         
+                        <td class="value ">-0.005</td>
+                        
                       </tr>
                       
                       <tr>
@@ -2475,6 +2704,8 @@
                         <td class="value good">0.011</td>
                         
                         <td class="value muted">0.883</td>
+                        
+                        <td class="value muted">0.546</td>
                         
                       </tr>
                       
@@ -2494,6 +2725,8 @@
                         
                         <td class="value muted">0.662</td>
                         
+                        <td class="value muted">0.598</td>
+                        
                       </tr>
                       
                       <tr>
@@ -2511,6 +2744,8 @@
                         <td class="value good">0.012</td>
                         
                         <td class="value muted">0.925</td>
+                        
+                        <td class="value muted">0.605</td>
                         
                       </tr>
                       
@@ -2543,6 +2778,8 @@
                         
                         <th>GPT OSS 120B</th>
                         
+                        <th>Claude Opus 4.7</th>
+                        
                       </tr>
                     </thead>
                     <tbody>
@@ -2558,6 +2795,8 @@
                         <td class="value ">373</td>
                         
                         <td class="value ">374</td>
+                        
+                        <td class="value ">375</td>
                         
                         <td class="value ">375</td>
                         
@@ -2581,6 +2820,8 @@
                         
                         <td class="value ">-0.051</td>
                         
+                        <td class="value ">-0.090</td>
+                        
                       </tr>
                       
                       <tr>
@@ -2598,6 +2839,8 @@
                         <td class="value muted">0.109</td>
                         
                         <td class="value muted">0.265</td>
+                        
+                        <td class="value good">0.001</td>
                         
                       </tr>
                       
@@ -2617,6 +2860,8 @@
                         
                         <td class="value muted">0.150</td>
                         
+                        <td class="value good">0.000</td>
+                        
                       </tr>
                       
                       <tr>
@@ -2634,6 +2879,8 @@
                         <td class="value muted">0.116</td>
                         
                         <td class="value muted">0.280</td>
+                        
+                        <td class="value good">0.002</td>
                         
                       </tr>
                       
@@ -2660,6 +2907,8 @@
                         
                         <th>GPT OSS 120B</th>
                         
+                        <th>Claude Opus 4.7</th>
+                        
                       </tr>
                     </thead>
                     <tbody>
@@ -2675,6 +2924,8 @@
                         <td class="value ">373</td>
                         
                         <td class="value ">374</td>
+                        
+                        <td class="value ">375</td>
                         
                         <td class="value ">375</td>
                         
@@ -2698,6 +2949,8 @@
                         
                         <td class="value ">0.001</td>
                         
+                        <td class="value ">-0.076</td>
+                        
                       </tr>
                       
                       <tr>
@@ -2715,6 +2968,8 @@
                         <td class="value muted">0.713</td>
                         
                         <td class="value muted">0.983</td>
+                        
+                        <td class="value good">0.005</td>
                         
                       </tr>
                       
@@ -2734,6 +2989,8 @@
                         
                         <td class="value muted">0.869</td>
                         
+                        <td class="value good">0.001</td>
+                        
                       </tr>
                       
                       <tr>
@@ -2751,6 +3008,8 @@
                         <td class="value muted">0.763</td>
                         
                         <td class="value muted">1.000</td>
+                        
+                        <td class="value good">0.010</td>
                         
                       </tr>
                       
@@ -2795,6 +3054,8 @@
                       
                       <th>GPT OSS 120B</th>
                       
+                      <th>Claude Opus 4.7</th>
+                      
                     </tr>
                   </thead>
                   <tbody>
@@ -2815,6 +3076,8 @@
                       
                       <td class="value ">0.2395</td>
                       
+                      <td class="value ">0.1832</td>
+                      
                     </tr>
                     
                     <tr>
@@ -2832,6 +3095,8 @@
                       <td class="value ">0.2327</td>
                       
                       <td class="value ">0.4535</td>
+                      
+                      <td class="value ">0.3141</td>
                       
                     </tr>
                     
@@ -2858,6 +3123,8 @@
                       
                       <th>GPT OSS 120B</th>
                       
+                      <th>Claude Opus 4.7</th>
+                      
                     </tr>
                   </thead>
                   <tbody>
@@ -2878,6 +3145,8 @@
                       
                       <td class="value ">3.0%</td>
                       
+                      <td class="value ">0.1%</td>
+                      
                     </tr>
                     
                     <tr>
@@ -2896,6 +3165,8 @@
                       
                       <td class="value ">0.378</td>
                       
+                      <td class="value ">0.567</td>
+                      
                     </tr>
                     
                     <tr>
@@ -2913,6 +3184,8 @@
                       <td class="value ">72.6%</td>
                       
                       <td class="value ">75.8%</td>
+                      
+                      <td class="value ">72.5%</td>
                       
                     </tr>
                     
@@ -2948,6 +3221,8 @@
                       
                       <th>GPT OSS 120B</th>
                       
+                      <th>Claude Opus 4.7</th>
+                      
                     </tr>
                   </thead>
                   <tbody>
@@ -2968,6 +3243,8 @@
                       
                       <td class="value ">0.0891</td>
                       
+                      <td class="value ">0.0389</td>
+                      
                     </tr>
                     
                     <tr>
@@ -2985,6 +3262,8 @@
                       <td class="value ">0.4757</td>
                       
                       <td class="value ">0.6749</td>
+                      
+                      <td class="value ">0.7712</td>
                       
                     </tr>
                     
@@ -3011,6 +3290,8 @@
                       
                       <th>GPT OSS 120B</th>
                       
+                      <th>Claude Opus 4.7</th>
+                      
                     </tr>
                   </thead>
                   <tbody>
@@ -3031,6 +3312,8 @@
                       
                       <td class="value ">0.6%</td>
                       
+                      <td class="value ">0.1%</td>
+                      
                     </tr>
                     
                     <tr>
@@ -3049,6 +3332,8 @@
                       
                       <td class="value ">0.700</td>
                       
+                      <td class="value ">0.858</td>
+                      
                     </tr>
                     
                     <tr>
@@ -3066,6 +3351,8 @@
                       <td class="value ">67.7%</td>
                       
                       <td class="value ">66.8%</td>
+                      
+                      <td class="value ">62.9%</td>
                       
                     </tr>
                     
@@ -3101,6 +3388,8 @@
                       
                       <th>GPT OSS 120B</th>
                       
+                      <th>Claude Opus 4.7</th>
+                      
                     </tr>
                   </thead>
                   <tbody>
@@ -3121,6 +3410,8 @@
                       
                       <td class="value ">0.0803</td>
                       
+                      <td class="value ">0.0339</td>
+                      
                     </tr>
                     
                     <tr>
@@ -3138,6 +3429,8 @@
                       <td class="value ">1.0231</td>
                       
                       <td class="value ">0.8977</td>
+                      
+                      <td class="value ">0.7386</td>
                       
                     </tr>
                     
@@ -3164,6 +3457,8 @@
                       
                       <th>GPT OSS 120B</th>
                       
+                      <th>Claude Opus 4.7</th>
+                      
                     </tr>
                   </thead>
                   <tbody>
@@ -3184,6 +3479,8 @@
                       
                       <td class="value ">1.0%</td>
                       
+                      <td class="value ">0.1%</td>
+                      
                     </tr>
                     
                     <tr>
@@ -3202,6 +3499,8 @@
                       
                       <td class="value ">0.697</td>
                       
+                      <td class="value ">0.905</td>
+                      
                     </tr>
                     
                     <tr>
@@ -3219,6 +3518,8 @@
                       <td class="value ">60.6%</td>
                       
                       <td class="value ">62.8%</td>
+                      
+                      <td class="value ">46.7%</td>
                       
                     </tr>
                     
@@ -3254,6 +3555,8 @@
                       
                       <th>GPT OSS 120B</th>
                       
+                      <th>Claude Opus 4.7</th>
+                      
                     </tr>
                   </thead>
                   <tbody>
@@ -3274,6 +3577,8 @@
                       
                       <td class="value ">0.1072</td>
                       
+                      <td class="value ">0.0549</td>
+                      
                     </tr>
                     
                     <tr>
@@ -3291,6 +3596,8 @@
                       <td class="value ">0.5064</td>
                       
                       <td class="value ">0.9587</td>
+                      
+                      <td class="value ">0.7388</td>
                       
                     </tr>
                     
@@ -3317,6 +3624,8 @@
                       
                       <th>GPT OSS 120B</th>
                       
+                      <th>Claude Opus 4.7</th>
+                      
                     </tr>
                   </thead>
                   <tbody>
@@ -3337,6 +3646,8 @@
                       
                       <td class="value ">1.2%</td>
                       
+                      <td class="value ">0.2%</td>
+                      
                     </tr>
                     
                     <tr>
@@ -3355,6 +3666,8 @@
                       
                       <td class="value ">0.724</td>
                       
+                      <td class="value ">0.874</td>
+                      
                     </tr>
                     
                     <tr>
@@ -3372,6 +3685,8 @@
                       <td class="value ">48.0%</td>
                       
                       <td class="value ">54.7%</td>
+                      
+                      <td class="value ">44.8%</td>
                       
                     </tr>
                     
@@ -3407,6 +3722,8 @@
                       
                       <th>GPT OSS 120B</th>
                       
+                      <th>Claude Opus 4.7</th>
+                      
                     </tr>
                   </thead>
                   <tbody>
@@ -3427,6 +3744,8 @@
                       
                       <td class="value ">0.0957</td>
                       
+                      <td class="value ">0.0267</td>
+                      
                     </tr>
                     
                     <tr>
@@ -3444,6 +3763,8 @@
                       <td class="value ">1.2229</td>
                       
                       <td class="value ">0.8735</td>
+                      
+                      <td class="value ">0.9040</td>
                       
                     </tr>
                     
@@ -3470,6 +3791,8 @@
                       
                       <th>GPT OSS 120B</th>
                       
+                      <th>Claude Opus 4.7</th>
+                      
                     </tr>
                   </thead>
                   <tbody>
@@ -3490,6 +3813,8 @@
                       
                       <td class="value ">1.1%</td>
                       
+                      <td class="value ">0.1%</td>
+                      
                     </tr>
                     
                     <tr>
@@ -3508,6 +3833,8 @@
                       
                       <td class="value ">0.787</td>
                       
+                      <td class="value ">0.928</td>
+                      
                     </tr>
                     
                     <tr>
@@ -3525,6 +3852,8 @@
                       <td class="value ">67.0%</td>
                       
                       <td class="value ">53.5%</td>
+                      
+                      <td class="value ">52.2%</td>
                       
                     </tr>
                     
@@ -3560,6 +3889,8 @@
                       
                       <th>GPT OSS 120B</th>
                       
+                      <th>Claude Opus 4.7</th>
+                      
                     </tr>
                   </thead>
                   <tbody>
@@ -3580,6 +3911,8 @@
                       
                       <td class="value ">0.0341</td>
                       
+                      <td class="value ">0.0232</td>
+                      
                     </tr>
                     
                     <tr>
@@ -3597,6 +3930,8 @@
                       <td class="value ">1.3704</td>
                       
                       <td class="value ">1.0312</td>
+                      
+                      <td class="value ">0.8966</td>
                       
                     </tr>
                     
@@ -3623,6 +3958,8 @@
                       
                       <th>GPT OSS 120B</th>
                       
+                      <th>Claude Opus 4.7</th>
+                      
                     </tr>
                   </thead>
                   <tbody>
@@ -3643,6 +3980,8 @@
                       
                       <td class="value ">0.2%</td>
                       
+                      <td class="value ">0.1%</td>
+                      
                     </tr>
                     
                     <tr>
@@ -3661,6 +4000,8 @@
                       
                       <td class="value ">0.747</td>
                       
+                      <td class="value ">0.899</td>
+                      
                     </tr>
                     
                     <tr>
@@ -3678,6 +4019,8 @@
                       <td class="value ">76.1%</td>
                       
                       <td class="value ">82.7%</td>
+                      
+                      <td class="value ">71.5%</td>
                       
                     </tr>
                     
@@ -3698,7 +4041,7 @@
   </main>
 
   <script>
-    window.__FAIR_J_CALC__ = {"Claude Haiku 4.5": 0.05774201158406409, "Claude Opus 4": 0.0374991419178894, "Claude Opus 4.5": 0.04139928698752228, "Claude Sonnet 4.6": 0.09417777777777779, "GPT OSS 120B": 0.10764444444444445};
+    window.__FAIR_J_CALC__ = {"Claude Haiku 4.5": 0.05774201158406409, "Claude Opus 4": 0.0374991419178894, "Claude Opus 4.5": 0.04139928698752228, "Claude Sonnet 4.6": 0.09417777777777779, "GPT OSS 120B": 0.10764444444444445, "Claude Opus 4.7": 0.06013333333333334};
     function setOpen(selector, openState) { document.querySelectorAll(selector).forEach(function(el) { el.open = openState; }); }
     document.querySelector('[data-open-all="section"]').addEventListener('click', function() { setOpen('details.section', true); });
     document.querySelector('[data-close-all="section"]').addEventListener('click', function() { setOpen('details.section', false); });
