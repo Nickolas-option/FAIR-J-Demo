@@ -1,0 +1,3785 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FAIR-J report</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f8fafc;
+      --panel: #ffffff;
+      --ink: #0f172a;
+      --muted: #475569;
+      --line: #cbd5e1;
+      --accent: #0284c7;
+      --accent-soft: #e0f2fe;
+      --bad: #dc2626;
+      --warn: #d97706;
+      --good: #16a34a;
+      --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+      --radius: 12px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+      --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.5;
+    }
+    main {
+      width: min(1400px, calc(100vw - 32px));
+      margin: 32px auto 64px;
+    }
+    .hero {
+      background: linear-gradient(135deg, #0f172a, #1e293b);
+      color: white;
+      padding: 24px 32px;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      margin-bottom: 24px;
+    }
+    .hero h1 {
+      margin: 0 0 8px;
+      font-size: 28px;
+    }
+    .hero p {
+      margin: 0;
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 16px;
+      max-width: 1000px;
+    }
+    .report-page {
+      display: none;
+    }
+    .report-page.is-active {
+      display: block;
+    }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    button {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 8px 16px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    button:hover {
+      background: #f1f5f9;
+    }
+    .summary-grid,
+    .group-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .summary-card,
+    .group-card,
+    details.section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .summary-card {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+    }
+    .summary-card h2 {
+      margin: 0 0 12px;
+      font-size: 20px;
+    }
+    .summary-verdict {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .summary-reason {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.4;
+    }
+    .stat-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+      margin-top: auto;
+      border-top: 1px solid var(--line);
+      padding-top: 16px;
+    }
+    .context-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .context-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 18px;
+    }
+    .context-card h3 {
+      margin: 0 0 14px;
+      font-size: 18px;
+    }
+    .context-card dl {
+      margin: 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 10px;
+    }
+    .context-card dt {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      margin: 0 0 2px;
+    }
+    .context-card dd {
+      margin: 0;
+      color: var(--ink);
+      word-break: break-word;
+    }
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+    }
+    .stat-item .label {
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+    .stat-item .value {
+      font-family: var(--mono);
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--ink);
+      margin-top: 4px;
+    }
+    .calculator-card {
+      margin-bottom: 24px;
+      border-color: #bae6fd;
+      background: #f0f9ff;
+    }
+    .calculator-card h3 {
+      margin: 0 0 8px;
+      color: #0369a1;
+      font-size: 18px;
+    }
+    .calculator-card p {
+      margin: 0 0 16px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .calculator-input-row {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .calculator-input-row label {
+      font-weight: 600;
+      color: #0f172a;
+      font-size: 14px;
+    }
+    .calculator-input-row input,
+    select {
+      padding: 8px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--line);
+      font-size: 14px;
+      background: #fff;
+      min-width: 160px;
+    }
+    .calculator-results {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 16px;
+    }
+    .calc-result-card {
+      background: white;
+      padding: 12px 16px;
+      border-radius: 8px;
+      border: 1px solid #ccfbf1;
+      font-size: 14px;
+      min-width: 180px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+    .calc-model {
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .calc-noise {
+      color: #0284c7;
+      font-size: 18px;
+      font-family: var(--mono);
+    }
+    details.section {
+      margin-bottom: 16px;
+      overflow: hidden;
+    }
+    details.section > summary {
+      cursor: pointer;
+      padding: 20px;
+      font-size: 20px;
+      font-weight: 600;
+      background: #f8fafc;
+      list-style: none;
+    }
+    details.section > summary::-webkit-details-marker {
+      display: none;
+    }
+    details.section[open] > summary {
+      border-bottom: 1px solid var(--line);
+    }
+    .section-body {
+      padding: 20px;
+    }
+    .section-explainer {
+      color: var(--muted);
+      margin-top: 0;
+      margin-bottom: 16px;
+      font-size: 14px;
+    }
+    .group-card {
+      padding: 18px;
+    }
+    .group-card h4 {
+      margin: 0 0 12px;
+      font-size: 16px;
+    }
+    .methodology-card {
+      margin-bottom: 24px;
+      padding: 20px;
+    }
+    .methodology-card h3 {
+      margin: 0 0 8px;
+      font-size: 18px;
+    }
+    .methodology-card p {
+      margin: 0 0 16px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .table-wrap {
+      overflow-x: auto;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 14px;
+    }
+    th,
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--line);
+    }
+    th {
+      background: #f1f5f9;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .value {
+      font-family: var(--mono);
+    }
+    .control-row {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 16px;
+      align-items: flex-end;
+      flex-wrap: wrap;
+    }
+    .control-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .control-field label {
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .stat-scope {
+      display: none;
+    }
+    .stat-scope.is-active {
+      display: block;
+    }
+    .good {
+      color: var(--good);
+      font-weight: 700;
+    }
+    .bad {
+      color: var(--bad);
+      font-weight: 700;
+    }
+    .warn {
+      color: var(--warn);
+      font-weight: 700;
+    }
+    .muted {
+      color: var(--muted);
+    }
+    .help-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      position: relative;
+    }
+    .help-label[data-help] {
+      cursor: help;
+    }
+    .help-label[data-help] .help-text {
+      border-bottom: 1px dotted var(--muted);
+    }
+    .help-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px;
+      height: 16px;
+      border-radius: 999px;
+      background: #eef2f7;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .app-tooltip {
+      position: fixed;
+      z-index: 9999;
+      max-width: 320px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: rgba(15, 23, 42, 0.96);
+      color: white;
+      font-size: 12px;
+      line-height: 1.45;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+      pointer-events: none;
+      opacity: 0;
+      transform: translateY(4px);
+      transition: opacity 120ms ease, transform 120ms ease;
+    }
+    .app-tooltip.is-visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .page-nav {
+      display: flex;
+      justify-content: center;
+      margin-top: 24px;
+    }
+    .page-toggle {
+      min-width: 56px;
+      font-size: 20px;
+      line-height: 1;
+      padding: 10px 16px;
+    }
+    @media (max-width: 720px) {
+      main {
+        width: min(100vw - 20px, 1400px);
+        margin: 20px auto 40px;
+      }
+      .hero {
+        padding: 18px;
+      }
+      .hero h1 {
+        font-size: 24px;
+      }
+      details.section > summary,
+      .section-body,
+      .summary-card,
+      .group-card {
+        padding: 16px;
+      }
+      th,
+      td {
+        padding: 10px 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  
+  <main>
+    <section class="hero">
+      <h1>FAIR-J report</h1>
+    </section>
+
+    <section class="report-page is-active" data-page="overview">
+      <section class="controls">
+        <button type="button" data-open-all="section">Expand All Sections</button>
+        <button type="button" data-close-all="section">Collapse All Sections</button>
+      </section>
+
+      <section>
+        <div class="context-grid">
+          
+          <article class="context-card">
+            <h3>Claude Haiku 4.5</h3>
+            <dl>
+              
+              <div>
+                <dt>Judge model</dt>
+                <dd>bedrock/claude-haiku-4-5</dd>
+              </div>
+              
+              <div>
+                <dt>Paraphrase model</dt>
+                <dd>bedrock/claude-sonnet-4-6</dd>
+              </div>
+              
+              <div>
+                <dt>Examples used</dt>
+                <dd>-</dd>
+              </div>
+              
+              <div>
+                <dt>Paraphrases per criterion</dt>
+                <dd>5</dd>
+              </div>
+              
+              <div>
+                <dt>Repeated calls</dt>
+                <dd>1</dd>
+              </div>
+              
+              <div>
+                <dt>Score scale</dt>
+                <dd>1 - 3</dd>
+              </div>
+              
+            </dl>
+          </article>
+          
+          <article class="context-card">
+            <h3>Claude Opus 4</h3>
+            <dl>
+              
+              <div>
+                <dt>Judge model</dt>
+                <dd>bedrock/claude-opus-4</dd>
+              </div>
+              
+              <div>
+                <dt>Paraphrase model</dt>
+                <dd>bedrock/claude-sonnet-4-6</dd>
+              </div>
+              
+              <div>
+                <dt>Examples used</dt>
+                <dd>-</dd>
+              </div>
+              
+              <div>
+                <dt>Paraphrases per criterion</dt>
+                <dd>5</dd>
+              </div>
+              
+              <div>
+                <dt>Repeated calls</dt>
+                <dd>1</dd>
+              </div>
+              
+              <div>
+                <dt>Score scale</dt>
+                <dd>1 - 3</dd>
+              </div>
+              
+            </dl>
+          </article>
+          
+          <article class="context-card">
+            <h3>Claude Opus 4.5</h3>
+            <dl>
+              
+              <div>
+                <dt>Judge model</dt>
+                <dd>bedrock/claude-opus-4-5</dd>
+              </div>
+              
+              <div>
+                <dt>Paraphrase model</dt>
+                <dd>bedrock/claude-sonnet-4-6</dd>
+              </div>
+              
+              <div>
+                <dt>Examples used</dt>
+                <dd>-</dd>
+              </div>
+              
+              <div>
+                <dt>Paraphrases per criterion</dt>
+                <dd>5</dd>
+              </div>
+              
+              <div>
+                <dt>Repeated calls</dt>
+                <dd>1</dd>
+              </div>
+              
+              <div>
+                <dt>Score scale</dt>
+                <dd>1 - 3</dd>
+              </div>
+              
+            </dl>
+          </article>
+          
+          <article class="context-card">
+            <h3>Claude Sonnet 4.6</h3>
+            <dl>
+              
+              <div>
+                <dt>Judge model</dt>
+                <dd>bedrock/claude-sonnet-4-6</dd>
+              </div>
+              
+              <div>
+                <dt>Paraphrase model</dt>
+                <dd>bedrock/claude-sonnet-4-6</dd>
+              </div>
+              
+              <div>
+                <dt>Examples used</dt>
+                <dd>-</dd>
+              </div>
+              
+              <div>
+                <dt>Paraphrases per criterion</dt>
+                <dd>5</dd>
+              </div>
+              
+              <div>
+                <dt>Repeated calls</dt>
+                <dd>1</dd>
+              </div>
+              
+              <div>
+                <dt>Score scale</dt>
+                <dd>1 - 3</dd>
+              </div>
+              
+            </dl>
+          </article>
+          
+          <article class="context-card">
+            <h3>GPT OSS 120B</h3>
+            <dl>
+              
+              <div>
+                <dt>Judge model</dt>
+                <dd>bedrock/gpt-oss-120b</dd>
+              </div>
+              
+              <div>
+                <dt>Paraphrase model</dt>
+                <dd>bedrock/claude-sonnet-4-6</dd>
+              </div>
+              
+              <div>
+                <dt>Examples used</dt>
+                <dd>-</dd>
+              </div>
+              
+              <div>
+                <dt>Paraphrases per criterion</dt>
+                <dd>5</dd>
+              </div>
+              
+              <div>
+                <dt>Repeated calls</dt>
+                <dd>1</dd>
+              </div>
+              
+              <div>
+                <dt>Score scale</dt>
+                <dd>1 - 3</dd>
+              </div>
+              
+            </dl>
+          </article>
+          
+        </div>
+      </section>
+
+      <section class="summary-grid">
+        
+        <article class="summary-card">
+          <h2>Claude Haiku 4.5</h2>
+          <div class="summary-verdict warn" title="Usable, but one or more stability signals are only moderate.">Review</div>
+          <div class="stat-list">
+            
+            <div class="stat-item">
+              <div class="label"><span class="help-label" data-help="Estimated share of ranking pairs that flip when the same criterion is paraphrased." tabindex="0" aria-label="Estimated share of ranking pairs that flip when the same criterion is paraphrased.">
+      <span class="help-text">Flips</span>
+      <span class="help-icon">i</span>
+    </span></div>
+              <div class="value">0.4%</div>
+            </div>
+            
+            <div class="stat-item">
+              <div class="label"><span class="help-label" data-help="Mean absolute score shift when the same criterion is paraphrased, normalized by score scale span. Lower is better." tabindex="0" aria-label="Mean absolute score shift when the same criterion is paraphrased, normalized by score scale span. Lower is better.">
+      <span class="help-text">Score Stability</span>
+      <span class="help-icon">i</span>
+    </span></div>
+              <div class="value">0.0577</div>
+            </div>
+            
+            <div class="stat-item">
+              <div class="label"><span class="help-label" data-help="Average Kendall&#39;s tau-b between baseline ranking and same-criterion paraphrased ranking. Higher is better." tabindex="0" aria-label="Average Kendall&#39;s tau-b between baseline ranking and same-criterion paraphrased ranking. Higher is better.">
+      <span class="help-text">Ranking Stability</span>
+      <span class="help-icon">i</span>
+    </span></div>
+              <div class="value">0.827</div>
+            </div>
+            
+            <div class="stat-item">
+              <div class="label"><span class="help-label" data-help="Cross-criterion normalized MAD divided by same-criterion normalized MAD. Lower means paraphrasing stays more isolated to the intended criterion." tabindex="0" aria-label="Cross-criterion normalized MAD divided by same-criterion normalized MAD. Lower means paraphrasing stays more isolated to the intended criterion.">
+      <span class="help-text">Spillover</span>
+      <span class="help-icon">i</span>
+    </span></div>
+              <div class="value">0.608</div>
+            </div>
+            
+          </div>
+        </article>
+        
+        <article class="summary-card">
+          <h2>Claude Opus 4</h2>
+          <div class="summary-verdict good" title="Low flips, stable same-criterion scores, and limited spillover.">Stable</div>
+          <div class="stat-list">
+            
+            <div class="stat-item">
+              <div class="label"><span class="help-label" data-help="Estimated share of ranking pairs that flip when the same criterion is paraphrased." tabindex="0" aria-label="Estimated share of ranking pairs that flip when the same criterion is paraphrased.">
+      <span class="help-text">Flips</span>
+      <span class="help-icon">i</span>
+    </span></div>
+              <div class="value">0.1%</div>
+            </div>
+            
+            <div class="stat-item">
+              <div class="label"><span class="help-label" data-help="Mean absolute score shift when the same criterion is paraphrased, normalized by score scale span. Lower is better." tabindex="0" aria-label="Mean absolute score shift when the same criterion is paraphrased, normalized by score scale span. Lower is better.">
+      <span class="help-text">Score Stability</span>
+      <span class="help-icon">i</span>
+    </span></div>
+              <div class="value">0.0375</div>
+            </div>
+            
+            <div class="stat-item">
+              <div class="label"><span class="help-label" data-help="Average Kendall&#39;s tau-b between baseline ranking and same-criterion paraphrased ranking. Higher is better." tabindex="0" aria-label="Average Kendall&#39;s tau-b between baseline ranking and same-criterion paraphrased ranking. Higher is better.">
+      <span class="help-text">Ranking Stability</span>
+      <span class="help-icon">i</span>
+    </span></div>
+              <div class="value">0.869</div>
+            </div>
+            
+            <div class="stat-item">
+              <div class="label"><span class="help-label" data-help="Cross-criterion normalized MAD divided by same-criterion normalized MAD. Lower means paraphrasing stays more isolated to the intended criterion." tabindex="0" aria-label="Cross-criterion normalized MAD divided by same-criterion normalized MAD. Lower means paraphrasing stays more isolated to the intended criterion.">
+      <span class="help-text">Spillover</span>
+      <span class="help-icon">i</span>
+    </span></div>
+              <div class="value">0.478</div>
+            </div>
+            
+          </div>
+        </article>
+        
+        <article class="summary-card">
+          <h2>Claude Opus 4.5</h2>
+          <div class="summary-verdict warn" title="Usable, but one or more stability signals are only moderate.">Review</div>
+          <div class="stat-list">
+            
+            <div class="stat-item">
+              <div class="label"><span class="help-label" data-help="Estimated share of ranking pairs that flip when the same criterion is paraphrased." tabindex="0" aria-label="Estimated share of ranking pairs that flip when the same criterion is paraphrased.">
+      <span class="help-text">Flips</span>
+      <span class="help-icon">i</span>
+    </span></div>
+              <div class="value">0.1%</div>
+            </div>
+            
+            <div class="stat-item">
+              <div class="label"><span class="help-label" data-help="Mean absolute score shift when the same criterion is paraphrased, normalized by score scale span. Lower is better." tabindex="0" aria-label="Mean absolute score shift when the same criterion is paraphrased, normalized by score scale span. Lower is better.">
+      <span class="help-text">Score Stability</span>
+      <span class="help-icon">i</span>
+    </span></div>
+              <div class="value">0.0414</div>
+            </div>
+            
+            <div class="stat-item">
+              <div class="label"><span class="help-label" data-help="Average Kendall&#39;s tau-b between baseline ranking and same-criterion paraphrased ranking. Higher is better." tabindex="0" aria-label="Average Kendall&#39;s tau-b between baseline ranking and same-criterion paraphrased ranking. Higher is better.">
+      <span class="help-text">Ranking Stability</span>
+      <span class="help-icon">i</span>
+    </span></div>
+              <div class="value">0.840</div>
+            </div>
+            
+            <div class="stat-item">
+              <div class="label"><span class="help-label" data-help="Cross-criterion normalized MAD divided by same-criterion normalized MAD. Lower means paraphrasing stays more isolated to the intended criterion." tabindex="0" aria-label="Cross-criterion normalized MAD divided by same-criterion normalized MAD. Lower means paraphrasing stays more isolated to the intended criterion.">
+      <span class="help-text">Spillover</span>
+      <span class="help-icon">i</span>
+    </span></div>
+              <div class="value">0.638</div>
+            </div>
+            
+          </div>
+        </article>
+        
+        <article class="summary-card">
+          <h2>Claude Sonnet 4.6</h2>
+          <div class="summary-verdict warn" title="Usable, but one or more stability signals are only moderate.">Review</div>
+          <div class="stat-list">
+            
+            <div class="stat-item">
+              <div class="label"><span class="help-label" data-help="Estimated share of ranking pairs that flip when the same criterion is paraphrased." tabindex="0" aria-label="Estimated share of ranking pairs that flip when the same criterion is paraphrased.">
+      <span class="help-text">Flips</span>
+      <span class="help-icon">i</span>
+    </span></div>
+              <div class="value">0.5%</div>
+            </div>
+            
+            <div class="stat-item">
+              <div class="label"><span class="help-label" data-help="Mean absolute score shift when the same criterion is paraphrased, normalized by score scale span. Lower is better." tabindex="0" aria-label="Mean absolute score shift when the same criterion is paraphrased, normalized by score scale span. Lower is better.">
+      <span class="help-text">Score Stability</span>
+      <span class="help-icon">i</span>
+    </span></div>
+              <div class="value">0.0942</div>
+            </div>
+            
+            <div class="stat-item">
+              <div class="label"><span class="help-label" data-help="Average Kendall&#39;s tau-b between baseline ranking and same-criterion paraphrased ranking. Higher is better." tabindex="0" aria-label="Average Kendall&#39;s tau-b between baseline ranking and same-criterion paraphrased ranking. Higher is better.">
+      <span class="help-text">Ranking Stability</span>
+      <span class="help-icon">i</span>
+    </span></div>
+              <div class="value">0.793</div>
+            </div>
+            
+            <div class="stat-item">
+              <div class="label"><span class="help-label" data-help="Cross-criterion normalized MAD divided by same-criterion normalized MAD. Lower means paraphrasing stays more isolated to the intended criterion." tabindex="0" aria-label="Cross-criterion normalized MAD divided by same-criterion normalized MAD. Lower means paraphrasing stays more isolated to the intended criterion.">
+      <span class="help-text">Spillover</span>
+      <span class="help-icon">i</span>
+    </span></div>
+              <div class="value">0.509</div>
+            </div>
+            
+          </div>
+        </article>
+        
+        <article class="summary-card">
+          <h2>GPT OSS 120B</h2>
+          <div class="summary-verdict warn" title="Usable, but one or more stability signals are only moderate.">Review</div>
+          <div class="stat-list">
+            
+            <div class="stat-item">
+              <div class="label"><span class="help-label" data-help="Estimated share of ranking pairs that flip when the same criterion is paraphrased." tabindex="0" aria-label="Estimated share of ranking pairs that flip when the same criterion is paraphrased.">
+      <span class="help-text">Flips</span>
+      <span class="help-icon">i</span>
+    </span></div>
+              <div class="value">1.2%</div>
+            </div>
+            
+            <div class="stat-item">
+              <div class="label"><span class="help-label" data-help="Mean absolute score shift when the same criterion is paraphrased, normalized by score scale span. Lower is better." tabindex="0" aria-label="Mean absolute score shift when the same criterion is paraphrased, normalized by score scale span. Lower is better.">
+      <span class="help-text">Score Stability</span>
+      <span class="help-icon">i</span>
+    </span></div>
+              <div class="value">0.1076</div>
+            </div>
+            
+            <div class="stat-item">
+              <div class="label"><span class="help-label" data-help="Average Kendall&#39;s tau-b between baseline ranking and same-criterion paraphrased ranking. Higher is better." tabindex="0" aria-label="Average Kendall&#39;s tau-b between baseline ranking and same-criterion paraphrased ranking. Higher is better.">
+      <span class="help-text">Ranking Stability</span>
+      <span class="help-icon">i</span>
+    </span></div>
+              <div class="value">0.672</div>
+            </div>
+            
+            <div class="stat-item">
+              <div class="label"><span class="help-label" data-help="Cross-criterion normalized MAD divided by same-criterion normalized MAD. Lower means paraphrasing stays more isolated to the intended criterion." tabindex="0" aria-label="Cross-criterion normalized MAD divided by same-criterion normalized MAD. Lower means paraphrasing stays more isolated to the intended criterion.">
+      <span class="help-text">Spillover</span>
+      <span class="help-icon">i</span>
+    </span></div>
+              <div class="value">0.716</div>
+            </div>
+            
+          </div>
+        </article>
+        
+      </section>
+
+      <section class="summary-card calculator-card">
+        <div>
+          <h3>Noise Calculator</h3>
+          <p>Estimate how same-criterion score stability shrinks as dataset size grows.</p>
+          <div class="calculator-input-row">
+            <label for="calc-n">Dataset Size (N):</label>
+            <input type="number" id="calc-n" value="1000" min="1">
+          </div>
+        </div>
+        <div id="calc-results" class="calculator-results"></div>
+      </section>
+
+      <section class="group-card methodology-card">
+        <h3>Methodology</h3>
+        <p>All stability metrics below read precomputed values from run.json and core_output.json. Scale-normalized means the score shift is divided by score scale span.</p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Metric</th>
+                <th>Meaning</th>
+                <th>Formula</th>
+              </tr>
+            </thead>
+            <tbody>
+              
+              <tr>
+                <td>Score Stability</td>
+                <td>How much the score changes when the same criterion is paraphrased.</td>
+                <td class="value">same-criterion MAD / scale span</td>
+              </tr>
+              
+              <tr>
+                <td>Ranking Stability</td>
+                <td>Whether example ordering stays consistent when the same criterion is paraphrased.</td>
+                <td class="value">mean same-criterion Kendall tau-b</td>
+              </tr>
+              
+              <tr>
+                <td>Flips</td>
+                <td>Estimated share of ranking pairs that reverse order after same-criterion paraphrasing.</td>
+                <td class="value">same-criterion discordant pairs / same-criterion total ranking pairs</td>
+              </tr>
+              
+              <tr>
+                <td>Spillover</td>
+                <td>Whether paraphrasing one criterion changes scores on other criteria.</td>
+                <td class="value">cross MAD / same-criterion MAD</td>
+              </tr>
+              
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      
+      <details class="section" open>
+        <summary><span class="help-label" data-help="Are scores stable when the same criterion is paraphrased? Lower score stability values and lower spillover mean cleaner dataset-level comparisons." tabindex="0" aria-label="Are scores stable when the same criterion is paraphrased? Lower score stability values and lower spillover mean cleaner dataset-level comparisons.">
+      <span class="help-text">Dataset Level</span>
+      <span class="help-icon">i</span>
+    </span></summary>
+        <div class="section-body">
+          <div class="group-grid">
+            
+            <section class="group-card">
+              <h4>Paraphrased vs Base</h4>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Metric</th>
+                      
+                      <th>Claude Haiku 4.5</th>
+                      
+                      <th>Claude Opus 4</th>
+                      
+                      <th>Claude Opus 4.5</th>
+                      
+                      <th>Claude Sonnet 4.6</th>
+                      
+                      <th>GPT OSS 120B</th>
+                      
+                    </tr>
+                  </thead>
+                  <tbody>
+                    
+                    <tr>
+                      <td><span class="help-label" data-help="Mean absolute score shift when the same criterion is paraphrased, normalized by score scale span. Lower is better." tabindex="0" aria-label="Mean absolute score shift when the same criterion is paraphrased, normalized by score scale span. Lower is better.">
+      <span class="help-text">Score Stability</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                      
+                      <td class="value ">0.0577</td>
+                      
+                      <td class="value ">0.0375</td>
+                      
+                      <td class="value ">0.0414</td>
+                      
+                      <td class="value ">0.0942</td>
+                      
+                      <td class="value ">0.1076</td>
+                      
+                    </tr>
+                    
+                    <tr>
+                      <td><span class="help-label" data-help="Cross-criterion normalized MAD divided by same-criterion normalized MAD. Lower means paraphrasing stays more isolated to the intended criterion." tabindex="0" aria-label="Cross-criterion normalized MAD divided by same-criterion normalized MAD. Lower means paraphrasing stays more isolated to the intended criterion.">
+      <span class="help-text">Spillover</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                      
+                      <td class="value ">0.6079</td>
+                      
+                      <td class="value ">0.4784</td>
+                      
+                      <td class="value ">0.6377</td>
+                      
+                      <td class="value ">0.5085</td>
+                      
+                      <td class="value ">0.7159</td>
+                      
+                    </tr>
+                    
+                  </tbody>
+                </table>
+              </div>
+            </section>
+            
+          </div>
+        </div>
+      </details>
+      
+      <details class="section" open>
+        <summary><span class="help-label" data-help="Does the judge preserve example ordering when the same criterion is rewritten? Higher ranking stability and lower flips are better." tabindex="0" aria-label="Does the judge preserve example ordering when the same criterion is rewritten? Higher ranking stability and lower flips are better.">
+      <span class="help-text">Ranking Consistency</span>
+      <span class="help-icon">i</span>
+    </span></summary>
+        <div class="section-body">
+          <div class="group-grid">
+            
+            <section class="group-card">
+              <h4>Paraphrased vs Base</h4>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Metric</th>
+                      
+                      <th>Claude Haiku 4.5</th>
+                      
+                      <th>Claude Opus 4</th>
+                      
+                      <th>Claude Opus 4.5</th>
+                      
+                      <th>Claude Sonnet 4.6</th>
+                      
+                      <th>GPT OSS 120B</th>
+                      
+                    </tr>
+                  </thead>
+                  <tbody>
+                    
+                    <tr>
+                      <td><span class="help-label" data-help="Estimated share of ranking pairs that flip when the same criterion is paraphrased." tabindex="0" aria-label="Estimated share of ranking pairs that flip when the same criterion is paraphrased.">
+      <span class="help-text">Flips</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                      
+                      <td class="value ">0.4%</td>
+                      
+                      <td class="value ">0.1%</td>
+                      
+                      <td class="value ">0.1%</td>
+                      
+                      <td class="value ">0.5%</td>
+                      
+                      <td class="value ">1.2%</td>
+                      
+                    </tr>
+                    
+                    <tr>
+                      <td><span class="help-label" data-help="Average Kendall&#39;s tau-b between baseline ranking and same-criterion paraphrased ranking. Higher is better." tabindex="0" aria-label="Average Kendall&#39;s tau-b between baseline ranking and same-criterion paraphrased ranking. Higher is better.">
+      <span class="help-text">Ranking Stability</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                      
+                      <td class="value ">0.827</td>
+                      
+                      <td class="value ">0.869</td>
+                      
+                      <td class="value ">0.840</td>
+                      
+                      <td class="value ">0.793</td>
+                      
+                      <td class="value ">0.672</td>
+                      
+                    </tr>
+                    
+                    <tr>
+                      <td><span class="help-label" data-help="Share of example pairs that receive tied scores when the same criterion is paraphrased." tabindex="0" aria-label="Share of example pairs that receive tied scores when the same criterion is paraphrased.">
+      <span class="help-text">Ties</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                      
+                      <td class="value ">61.3%</td>
+                      
+                      <td class="value ">66.7%</td>
+                      
+                      <td class="value ">60.9%</td>
+                      
+                      <td class="value ">65.3%</td>
+                      
+                      <td class="value ">66.1%</td>
+                      
+                    </tr>
+                    
+                  </tbody>
+                </table>
+              </div>
+            </section>
+            
+          </div>
+        </div>
+      </details>
+      
+
+      <details class="section">
+        <summary>Statistical Tests</summary>
+        <div class="section-body">
+          <div class="control-row">
+            <div class="control-field">
+              <label for="stat-combined-select">Score</label>
+              <select id="stat-combined-select" data-stat-combined-select>
+                
+                <option value="fed_diverse">fed diverse</option>
+                
+                <option value="fed_fluent">fed fluent</option>
+                
+                <option value="fed_interesting">fed interesting</option>
+                
+                <option value="fed_likeable">fed likeable</option>
+                
+                <option value="fed_relevant">fed relevant</option>
+                
+                <option value="fed_understandable">fed understandable</option>
+                
+                <option value="__total__">Total Score (All criteria pooled)</option>
+                
+              </select>
+            </div>
+          </div>
+          
+          <div class="stat-scope is-active" data-stat-scope="fed_diverse">
+            <div class="group-grid">
+              
+              <section class="group-card">
+                <h4>Paraphrased vs Base</h4>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Metric</th>
+                        
+                        <th>Claude Haiku 4.5</th>
+                        
+                        <th>Claude Opus 4</th>
+                        
+                        <th>Claude Opus 4.5</th>
+                        
+                        <th>Claude Sonnet 4.6</th>
+                        
+                        <th>GPT OSS 120B</th>
+                        
+                      </tr>
+                    </thead>
+                    <tbody>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Number of paired observations used by the statistical test." tabindex="0" aria-label="Number of paired observations used by the statistical test.">
+      <span class="help-text">N</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value ">373</td>
+                        
+                        <td class="value ">373</td>
+                        
+                        <td class="value ">374</td>
+                        
+                        <td class="value ">375</td>
+                        
+                        <td class="value ">375</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Average baseline minus perturbation score difference." tabindex="0" aria-label="Average baseline minus perturbation score difference.">
+      <span class="help-text">Δ</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value ">-0.025</td>
+                        
+                        <td class="value ">-0.016</td>
+                        
+                        <td class="value ">0.009</td>
+                        
+                        <td class="value ">-0.099</td>
+                        
+                        <td class="value ">-0.090</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Paired t-test p-value for baseline versus perturbation differences." tabindex="0" aria-label="Paired t-test p-value for baseline versus perturbation differences.">
+      <span class="help-text">Paired t-test p-value</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value good">0.044</td>
+                        
+                        <td class="value muted">0.122</td>
+                        
+                        <td class="value muted">0.268</td>
+                        
+                        <td class="value good">0.000</td>
+                        
+                        <td class="value good">0.000</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Wilcoxon signed-rank p-value for paired differences." tabindex="0" aria-label="Wilcoxon signed-rank p-value for paired differences.">
+      <span class="help-text">Wilcoxon p-value</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value good">0.033</td>
+                        
+                        <td class="value good">0.026</td>
+                        
+                        <td class="value muted">0.223</td>
+                        
+                        <td class="value good">0.000</td>
+                        
+                        <td class="value good">0.000</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Permutation test p-value for paired differences." tabindex="0" aria-label="Permutation test p-value for paired differences.">
+      <span class="help-text">Permutation p-value</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value good">0.034</td>
+                        
+                        <td class="value muted">0.120</td>
+                        
+                        <td class="value muted">0.238</td>
+                        
+                        <td class="value good">0.002</td>
+                        
+                        <td class="value good">0.002</td>
+                        
+                      </tr>
+                      
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+              
+              <section class="group-card">
+                <h4>Deleted vs Base</h4>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Metric</th>
+                        
+                        <th>Claude Haiku 4.5</th>
+                        
+                        <th>Claude Opus 4</th>
+                        
+                        <th>Claude Opus 4.5</th>
+                        
+                        <th>Claude Sonnet 4.6</th>
+                        
+                        <th>GPT OSS 120B</th>
+                        
+                      </tr>
+                    </thead>
+                    <tbody>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Number of paired observations used by the statistical test." tabindex="0" aria-label="Number of paired observations used by the statistical test.">
+      <span class="help-text">N</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value ">373</td>
+                        
+                        <td class="value ">373</td>
+                        
+                        <td class="value ">374</td>
+                        
+                        <td class="value ">375</td>
+                        
+                        <td class="value ">375</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Average baseline minus perturbation score difference." tabindex="0" aria-label="Average baseline minus perturbation score difference.">
+      <span class="help-text">Δ</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value ">-0.015</td>
+                        
+                        <td class="value ">-0.059</td>
+                        
+                        <td class="value ">-0.029</td>
+                        
+                        <td class="value ">-0.081</td>
+                        
+                        <td class="value ">-0.041</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Paired t-test p-value for baseline versus perturbation differences." tabindex="0" aria-label="Paired t-test p-value for baseline versus perturbation differences.">
+      <span class="help-text">Paired t-test p-value</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value muted">0.288</td>
+                        
+                        <td class="value good">0.000</td>
+                        
+                        <td class="value good">0.003</td>
+                        
+                        <td class="value good">0.000</td>
+                        
+                        <td class="value good">0.036</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Wilcoxon signed-rank p-value for paired differences." tabindex="0" aria-label="Wilcoxon signed-rank p-value for paired differences.">
+      <span class="help-text">Wilcoxon p-value</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value muted">0.296</td>
+                        
+                        <td class="value good">0.000</td>
+                        
+                        <td class="value good">0.000</td>
+                        
+                        <td class="value good">0.000</td>
+                        
+                        <td class="value good">0.046</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Permutation test p-value for paired differences." tabindex="0" aria-label="Permutation test p-value for paired differences.">
+      <span class="help-text">Permutation p-value</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value muted">0.314</td>
+                        
+                        <td class="value good">0.002</td>
+                        
+                        <td class="value good">0.006</td>
+                        
+                        <td class="value good">0.002</td>
+                        
+                        <td class="value good">0.042</td>
+                        
+                      </tr>
+                      
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+              
+            </div>
+          </div>
+          
+          <div class="stat-scope" data-stat-scope="fed_fluent">
+            <div class="group-grid">
+              
+              <section class="group-card">
+                <h4>Paraphrased vs Base</h4>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Metric</th>
+                        
+                        <th>Claude Haiku 4.5</th>
+                        
+                        <th>Claude Opus 4</th>
+                        
+                        <th>Claude Opus 4.5</th>
+                        
+                        <th>Claude Sonnet 4.6</th>
+                        
+                        <th>GPT OSS 120B</th>
+                        
+                      </tr>
+                    </thead>
+                    <tbody>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Number of paired observations used by the statistical test." tabindex="0" aria-label="Number of paired observations used by the statistical test.">
+      <span class="help-text">N</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value ">373</td>
+                        
+                        <td class="value ">373</td>
+                        
+                        <td class="value ">374</td>
+                        
+                        <td class="value ">375</td>
+                        
+                        <td class="value ">375</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Average baseline minus perturbation score difference." tabindex="0" aria-label="Average baseline minus perturbation score difference.">
+      <span class="help-text">Δ</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value ">0.019</td>
+                        
+                        <td class="value ">0.003</td>
+                        
+                        <td class="value ">0.031</td>
+                        
+                        <td class="value ">0.031</td>
+                        
+                        <td class="value ">-0.005</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Paired t-test p-value for baseline versus perturbation differences." tabindex="0" aria-label="Paired t-test p-value for baseline versus perturbation differences.">
+      <span class="help-text">Paired t-test p-value</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value good">0.030</td>
+                        
+                        <td class="value muted">0.430</td>
+                        
+                        <td class="value good">0.001</td>
+                        
+                        <td class="value good">0.019</td>
+                        
+                        <td class="value muted">0.699</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Wilcoxon signed-rank p-value for paired differences." tabindex="0" aria-label="Wilcoxon signed-rank p-value for paired differences.">
+      <span class="help-text">Wilcoxon p-value</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value good">0.025</td>
+                        
+                        <td class="value muted">0.261</td>
+                        
+                        <td class="value good">0.000</td>
+                        
+                        <td class="value good">0.000</td>
+                        
+                        <td class="value muted">0.416</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Permutation test p-value for paired differences." tabindex="0" aria-label="Permutation test p-value for paired differences.">
+      <span class="help-text">Permutation p-value</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value good">0.022</td>
+                        
+                        <td class="value muted">0.486</td>
+                        
+                        <td class="value good">0.004</td>
+                        
+                        <td class="value good">0.014</td>
+                        
+                        <td class="value muted">0.693</td>
+                        
+                      </tr>
+                      
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+              
+              <section class="group-card">
+                <h4>Deleted vs Base</h4>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Metric</th>
+                        
+                        <th>Claude Haiku 4.5</th>
+                        
+                        <th>Claude Opus 4</th>
+                        
+                        <th>Claude Opus 4.5</th>
+                        
+                        <th>Claude Sonnet 4.6</th>
+                        
+                        <th>GPT OSS 120B</th>
+                        
+                      </tr>
+                    </thead>
+                    <tbody>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Number of paired observations used by the statistical test." tabindex="0" aria-label="Number of paired observations used by the statistical test.">
+      <span class="help-text">N</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value ">373</td>
+                        
+                        <td class="value ">373</td>
+                        
+                        <td class="value ">374</td>
+                        
+                        <td class="value ">375</td>
+                        
+                        <td class="value ">375</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Average baseline minus perturbation score difference." tabindex="0" aria-label="Average baseline minus perturbation score difference.">
+      <span class="help-text">Δ</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value ">0.010</td>
+                        
+                        <td class="value ">0.009</td>
+                        
+                        <td class="value ">0.017</td>
+                        
+                        <td class="value ">0.007</td>
+                        
+                        <td class="value ">1.18e-18</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Paired t-test p-value for baseline versus perturbation differences." tabindex="0" aria-label="Paired t-test p-value for baseline versus perturbation differences.">
+      <span class="help-text">Paired t-test p-value</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value muted">0.388</td>
+                        
+                        <td class="value muted">0.148</td>
+                        
+                        <td class="value muted">0.129</td>
+                        
+                        <td class="value muted">0.662</td>
+                        
+                        <td class="value muted">1.000</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Wilcoxon signed-rank p-value for paired differences." tabindex="0" aria-label="Wilcoxon signed-rank p-value for paired differences.">
+      <span class="help-text">Wilcoxon p-value</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value muted">0.412</td>
+                        
+                        <td class="value muted">0.186</td>
+                        
+                        <td class="value muted">0.087</td>
+                        
+                        <td class="value muted">0.457</td>
+                        
+                        <td class="value muted">0.904</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Permutation test p-value for paired differences." tabindex="0" aria-label="Permutation test p-value for paired differences.">
+      <span class="help-text">Permutation p-value</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value muted">0.418</td>
+                        
+                        <td class="value muted">0.178</td>
+                        
+                        <td class="value muted">0.128</td>
+                        
+                        <td class="value muted">0.661</td>
+                        
+                        <td class="value muted">0.939</td>
+                        
+                      </tr>
+                      
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+              
+            </div>
+          </div>
+          
+          <div class="stat-scope" data-stat-scope="fed_interesting">
+            <div class="group-grid">
+              
+              <section class="group-card">
+                <h4>Paraphrased vs Base</h4>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Metric</th>
+                        
+                        <th>Claude Haiku 4.5</th>
+                        
+                        <th>Claude Opus 4</th>
+                        
+                        <th>Claude Opus 4.5</th>
+                        
+                        <th>Claude Sonnet 4.6</th>
+                        
+                        <th>GPT OSS 120B</th>
+                        
+                      </tr>
+                    </thead>
+                    <tbody>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Number of paired observations used by the statistical test." tabindex="0" aria-label="Number of paired observations used by the statistical test.">
+      <span class="help-text">N</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value ">373</td>
+                        
+                        <td class="value ">373</td>
+                        
+                        <td class="value ">374</td>
+                        
+                        <td class="value ">375</td>
+                        
+                        <td class="value ">375</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Average baseline minus perturbation score difference." tabindex="0" aria-label="Average baseline minus perturbation score difference.">
+      <span class="help-text">Δ</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value ">0.013</td>
+                        
+                        <td class="value ">0.007</td>
+                        
+                        <td class="value ">0.027</td>
+                        
+                        <td class="value ">-0.045</td>
+                        
+                        <td class="value ">0.028</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Paired t-test p-value for baseline versus perturbation differences." tabindex="0" aria-label="Paired t-test p-value for baseline versus perturbation differences.">
+      <span class="help-text">Paired t-test p-value</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value muted">0.206</td>
+                        
+                        <td class="value muted">0.311</td>
+                        
+                        <td class="value good">0.001</td>
+                        
+                        <td class="value good">0.002</td>
+                        
+                        <td class="value good">0.047</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Wilcoxon signed-rank p-value for paired differences." tabindex="0" aria-label="Wilcoxon signed-rank p-value for paired differences.">
+      <span class="help-text">Wilcoxon p-value</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value muted">0.298</td>
+                        
+                        <td class="value muted">0.339</td>
+                        
+                        <td class="value good">0.002</td>
+                        
+                        <td class="value good">0.010</td>
+                        
+                        <td class="value muted">0.142</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Permutation test p-value for paired differences." tabindex="0" aria-label="Permutation test p-value for paired differences.">
+      <span class="help-text">Permutation p-value</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value muted">0.188</td>
+                        
+                        <td class="value muted">0.318</td>
+                        
+                        <td class="value good">0.002</td>
+                        
+                        <td class="value good">0.002</td>
+                        
+                        <td class="value good">0.050</td>
+                        
+                      </tr>
+                      
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+              
+              <section class="group-card">
+                <h4>Deleted vs Base</h4>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Metric</th>
+                        
+                        <th>Claude Haiku 4.5</th>
+                        
+                        <th>Claude Opus 4</th>
+                        
+                        <th>Claude Opus 4.5</th>
+                        
+                        <th>Claude Sonnet 4.6</th>
+                        
+                        <th>GPT OSS 120B</th>
+                        
+                      </tr>
+                    </thead>
+                    <tbody>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Number of paired observations used by the statistical test." tabindex="0" aria-label="Number of paired observations used by the statistical test.">
+      <span class="help-text">N</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value ">373</td>
+                        
+                        <td class="value ">373</td>
+                        
+                        <td class="value ">374</td>
+                        
+                        <td class="value ">375</td>
+                        
+                        <td class="value ">375</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Average baseline minus perturbation score difference." tabindex="0" aria-label="Average baseline minus perturbation score difference.">
+      <span class="help-text">Δ</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value ">0.009</td>
+                        
+                        <td class="value ">0.001</td>
+                        
+                        <td class="value ">-0.019</td>
+                        
+                        <td class="value ">0.025</td>
+                        
+                        <td class="value ">0.054</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Paired t-test p-value for baseline versus perturbation differences." tabindex="0" aria-label="Paired t-test p-value for baseline versus perturbation differences.">
+      <span class="help-text">Paired t-test p-value</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value muted">0.489</td>
+                        
+                        <td class="value muted">0.944</td>
+                        
+                        <td class="value muted">0.081</td>
+                        
+                        <td class="value muted">0.189</td>
+                        
+                        <td class="value good">0.001</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Wilcoxon signed-rank p-value for paired differences." tabindex="0" aria-label="Wilcoxon signed-rank p-value for paired differences.">
+      <span class="help-text">Wilcoxon p-value</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value muted">0.473</td>
+                        
+                        <td class="value muted">0.979</td>
+                        
+                        <td class="value muted">0.064</td>
+                        
+                        <td class="value muted">0.208</td>
+                        
+                        <td class="value good">0.001</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Permutation test p-value for paired differences." tabindex="0" aria-label="Permutation test p-value for paired differences.">
+      <span class="help-text">Permutation p-value</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value muted">0.494</td>
+                        
+                        <td class="value muted">1.000</td>
+                        
+                        <td class="value muted">0.096</td>
+                        
+                        <td class="value muted">0.230</td>
+                        
+                        <td class="value good">0.002</td>
+                        
+                      </tr>
+                      
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+              
+            </div>
+          </div>
+          
+          <div class="stat-scope" data-stat-scope="fed_likeable">
+            <div class="group-grid">
+              
+              <section class="group-card">
+                <h4>Paraphrased vs Base</h4>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Metric</th>
+                        
+                        <th>Claude Haiku 4.5</th>
+                        
+                        <th>Claude Opus 4</th>
+                        
+                        <th>Claude Opus 4.5</th>
+                        
+                        <th>Claude Sonnet 4.6</th>
+                        
+                        <th>GPT OSS 120B</th>
+                        
+                      </tr>
+                    </thead>
+                    <tbody>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Number of paired observations used by the statistical test." tabindex="0" aria-label="Number of paired observations used by the statistical test.">
+      <span class="help-text">N</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value ">373</td>
+                        
+                        <td class="value ">373</td>
+                        
+                        <td class="value ">374</td>
+                        
+                        <td class="value ">375</td>
+                        
+                        <td class="value ">375</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Average baseline minus perturbation score difference." tabindex="0" aria-label="Average baseline minus perturbation score difference.">
+      <span class="help-text">Δ</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value ">0.013</td>
+                        
+                        <td class="value ">-0.003</td>
+                        
+                        <td class="value ">0.000</td>
+                        
+                        <td class="value ">0.027</td>
+                        
+                        <td class="value ">-0.005</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Paired t-test p-value for baseline versus perturbation differences." tabindex="0" aria-label="Paired t-test p-value for baseline versus perturbation differences.">
+      <span class="help-text">Paired t-test p-value</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value muted">0.228</td>
+                        
+                        <td class="value muted">0.740</td>
+                        
+                        <td class="value muted">0.969</td>
+                        
+                        <td class="value muted">0.089</td>
+                        
+                        <td class="value muted">0.744</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Wilcoxon signed-rank p-value for paired differences." tabindex="0" aria-label="Wilcoxon signed-rank p-value for paired differences.">
+      <span class="help-text">Wilcoxon p-value</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value muted">0.240</td>
+                        
+                        <td class="value muted">0.839</td>
+                        
+                        <td class="value muted">0.997</td>
+                        
+                        <td class="value good">0.015</td>
+                        
+                        <td class="value muted">0.962</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Permutation test p-value for paired differences." tabindex="0" aria-label="Permutation test p-value for paired differences.">
+      <span class="help-text">Permutation p-value</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value muted">0.230</td>
+                        
+                        <td class="value muted">0.717</td>
+                        
+                        <td class="value muted">0.987</td>
+                        
+                        <td class="value muted">0.102</td>
+                        
+                        <td class="value muted">0.783</td>
+                        
+                      </tr>
+                      
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+              
+              <section class="group-card">
+                <h4>Deleted vs Base</h4>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Metric</th>
+                        
+                        <th>Claude Haiku 4.5</th>
+                        
+                        <th>Claude Opus 4</th>
+                        
+                        <th>Claude Opus 4.5</th>
+                        
+                        <th>Claude Sonnet 4.6</th>
+                        
+                        <th>GPT OSS 120B</th>
+                        
+                      </tr>
+                    </thead>
+                    <tbody>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Number of paired observations used by the statistical test." tabindex="0" aria-label="Number of paired observations used by the statistical test.">
+      <span class="help-text">N</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value ">373</td>
+                        
+                        <td class="value ">373</td>
+                        
+                        <td class="value ">374</td>
+                        
+                        <td class="value ">375</td>
+                        
+                        <td class="value ">375</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Average baseline minus perturbation score difference." tabindex="0" aria-label="Average baseline minus perturbation score difference.">
+      <span class="help-text">Δ</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value ">0.009</td>
+                        
+                        <td class="value ">-0.039</td>
+                        
+                        <td class="value ">-0.051</td>
+                        
+                        <td class="value ">0.032</td>
+                        
+                        <td class="value ">-0.036</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Paired t-test p-value for baseline versus perturbation differences." tabindex="0" aria-label="Paired t-test p-value for baseline versus perturbation differences.">
+      <span class="help-text">Paired t-test p-value</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value muted">0.498</td>
+                        
+                        <td class="value good">0.001</td>
+                        
+                        <td class="value good">0.000</td>
+                        
+                        <td class="value muted">0.114</td>
+                        
+                        <td class="value muted">0.064</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Wilcoxon signed-rank p-value for paired differences." tabindex="0" aria-label="Wilcoxon signed-rank p-value for paired differences.">
+      <span class="help-text">Wilcoxon p-value</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value muted">0.747</td>
+                        
+                        <td class="value good">0.000</td>
+                        
+                        <td class="value good">0.000</td>
+                        
+                        <td class="value good">0.036</td>
+                        
+                        <td class="value muted">0.082</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Permutation test p-value for paired differences." tabindex="0" aria-label="Permutation test p-value for paired differences.">
+      <span class="help-text">Permutation p-value</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value muted">0.523</td>
+                        
+                        <td class="value good">0.004</td>
+                        
+                        <td class="value good">0.002</td>
+                        
+                        <td class="value muted">0.152</td>
+                        
+                        <td class="value muted">0.094</td>
+                        
+                      </tr>
+                      
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+              
+            </div>
+          </div>
+          
+          <div class="stat-scope" data-stat-scope="fed_relevant">
+            <div class="group-grid">
+              
+              <section class="group-card">
+                <h4>Paraphrased vs Base</h4>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Metric</th>
+                        
+                        <th>Claude Haiku 4.5</th>
+                        
+                        <th>Claude Opus 4</th>
+                        
+                        <th>Claude Opus 4.5</th>
+                        
+                        <th>Claude Sonnet 4.6</th>
+                        
+                        <th>GPT OSS 120B</th>
+                        
+                      </tr>
+                    </thead>
+                    <tbody>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Number of paired observations used by the statistical test." tabindex="0" aria-label="Number of paired observations used by the statistical test.">
+      <span class="help-text">N</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value ">373</td>
+                        
+                        <td class="value ">373</td>
+                        
+                        <td class="value ">374</td>
+                        
+                        <td class="value ">375</td>
+                        
+                        <td class="value ">375</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Average baseline minus perturbation score difference." tabindex="0" aria-label="Average baseline minus perturbation score difference.">
+      <span class="help-text">Δ</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value ">0.022</td>
+                        
+                        <td class="value ">0.004</td>
+                        
+                        <td class="value ">0.009</td>
+                        
+                        <td class="value ">0.009</td>
+                        
+                        <td class="value ">0.020</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Paired t-test p-value for baseline versus perturbation differences." tabindex="0" aria-label="Paired t-test p-value for baseline versus perturbation differences.">
+      <span class="help-text">Paired t-test p-value</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value muted">0.056</td>
+                        
+                        <td class="value muted">0.601</td>
+                        
+                        <td class="value muted">0.307</td>
+                        
+                        <td class="value muted">0.534</td>
+                        
+                        <td class="value muted">0.214</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Wilcoxon signed-rank p-value for paired differences." tabindex="0" aria-label="Wilcoxon signed-rank p-value for paired differences.">
+      <span class="help-text">Wilcoxon p-value</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value good">0.029</td>
+                        
+                        <td class="value muted">0.711</td>
+                        
+                        <td class="value muted">0.174</td>
+                        
+                        <td class="value muted">0.148</td>
+                        
+                        <td class="value muted">0.179</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Permutation test p-value for paired differences." tabindex="0" aria-label="Permutation test p-value for paired differences.">
+      <span class="help-text">Permutation p-value</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value good">0.038</td>
+                        
+                        <td class="value muted">0.673</td>
+                        
+                        <td class="value muted">0.342</td>
+                        
+                        <td class="value muted">0.583</td>
+                        
+                        <td class="value muted">0.248</td>
+                        
+                      </tr>
+                      
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+              
+              <section class="group-card">
+                <h4>Deleted vs Base</h4>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Metric</th>
+                        
+                        <th>Claude Haiku 4.5</th>
+                        
+                        <th>Claude Opus 4</th>
+                        
+                        <th>Claude Opus 4.5</th>
+                        
+                        <th>Claude Sonnet 4.6</th>
+                        
+                        <th>GPT OSS 120B</th>
+                        
+                      </tr>
+                    </thead>
+                    <tbody>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Number of paired observations used by the statistical test." tabindex="0" aria-label="Number of paired observations used by the statistical test.">
+      <span class="help-text">N</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value ">373</td>
+                        
+                        <td class="value ">373</td>
+                        
+                        <td class="value ">374</td>
+                        
+                        <td class="value ">375</td>
+                        
+                        <td class="value ">375</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Average baseline minus perturbation score difference." tabindex="0" aria-label="Average baseline minus perturbation score difference.">
+      <span class="help-text">Δ</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value ">0.008</td>
+                        
+                        <td class="value ">0.017</td>
+                        
+                        <td class="value ">0.019</td>
+                        
+                        <td class="value ">0.003</td>
+                        
+                        <td class="value ">0.022</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Paired t-test p-value for baseline versus perturbation differences." tabindex="0" aria-label="Paired t-test p-value for baseline versus perturbation differences.">
+      <span class="help-text">Paired t-test p-value</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value muted">0.593</td>
+                        
+                        <td class="value good">0.037</td>
+                        
+                        <td class="value good">0.048</td>
+                        
+                        <td class="value muted">0.857</td>
+                        
+                        <td class="value muted">0.215</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Wilcoxon signed-rank p-value for paired differences." tabindex="0" aria-label="Wilcoxon signed-rank p-value for paired differences.">
+      <span class="help-text">Wilcoxon p-value</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value muted">0.438</td>
+                        
+                        <td class="value good">0.044</td>
+                        
+                        <td class="value muted">0.061</td>
+                        
+                        <td class="value muted">0.663</td>
+                        
+                        <td class="value muted">0.239</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Permutation test p-value for paired differences." tabindex="0" aria-label="Permutation test p-value for paired differences.">
+      <span class="help-text">Permutation p-value</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value muted">0.593</td>
+                        
+                        <td class="value good">0.044</td>
+                        
+                        <td class="value good">0.048</td>
+                        
+                        <td class="value muted">0.931</td>
+                        
+                        <td class="value muted">0.274</td>
+                        
+                      </tr>
+                      
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+              
+            </div>
+          </div>
+          
+          <div class="stat-scope" data-stat-scope="fed_understandable">
+            <div class="group-grid">
+              
+              <section class="group-card">
+                <h4>Paraphrased vs Base</h4>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Metric</th>
+                        
+                        <th>Claude Haiku 4.5</th>
+                        
+                        <th>Claude Opus 4</th>
+                        
+                        <th>Claude Opus 4.5</th>
+                        
+                        <th>Claude Sonnet 4.6</th>
+                        
+                        <th>GPT OSS 120B</th>
+                        
+                      </tr>
+                    </thead>
+                    <tbody>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Number of paired observations used by the statistical test." tabindex="0" aria-label="Number of paired observations used by the statistical test.">
+      <span class="help-text">N</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value ">373</td>
+                        
+                        <td class="value ">373</td>
+                        
+                        <td class="value ">374</td>
+                        
+                        <td class="value ">375</td>
+                        
+                        <td class="value ">375</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Average baseline minus perturbation score difference." tabindex="0" aria-label="Average baseline minus perturbation score difference.">
+      <span class="help-text">Δ</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value ">0.002</td>
+                        
+                        <td class="value ">0.001</td>
+                        
+                        <td class="value ">-0.010</td>
+                        
+                        <td class="value ">0.006</td>
+                        
+                        <td class="value ">0.001</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Paired t-test p-value for baseline versus perturbation differences." tabindex="0" aria-label="Paired t-test p-value for baseline versus perturbation differences.">
+      <span class="help-text">Paired t-test p-value</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value muted">0.860</td>
+                        
+                        <td class="value muted">0.557</td>
+                        
+                        <td class="value muted">0.250</td>
+                        
+                        <td class="value muted">0.527</td>
+                        
+                        <td class="value muted">0.882</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Wilcoxon signed-rank p-value for paired differences." tabindex="0" aria-label="Wilcoxon signed-rank p-value for paired differences.">
+      <span class="help-text">Wilcoxon p-value</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value muted">0.909</td>
+                        
+                        <td class="value muted">0.441</td>
+                        
+                        <td class="value muted">0.210</td>
+                        
+                        <td class="value muted">0.134</td>
+                        
+                        <td class="value muted">0.119</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Permutation test p-value for paired differences." tabindex="0" aria-label="Permutation test p-value for paired differences.">
+      <span class="help-text">Permutation p-value</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value muted">0.887</td>
+                        
+                        <td class="value muted">0.617</td>
+                        
+                        <td class="value muted">0.248</td>
+                        
+                        <td class="value muted">0.533</td>
+                        
+                        <td class="value muted">0.907</td>
+                        
+                      </tr>
+                      
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+              
+              <section class="group-card">
+                <h4>Deleted vs Base</h4>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Metric</th>
+                        
+                        <th>Claude Haiku 4.5</th>
+                        
+                        <th>Claude Opus 4</th>
+                        
+                        <th>Claude Opus 4.5</th>
+                        
+                        <th>Claude Sonnet 4.6</th>
+                        
+                        <th>GPT OSS 120B</th>
+                        
+                      </tr>
+                    </thead>
+                    <tbody>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Number of paired observations used by the statistical test." tabindex="0" aria-label="Number of paired observations used by the statistical test.">
+      <span class="help-text">N</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value ">373</td>
+                        
+                        <td class="value ">373</td>
+                        
+                        <td class="value ">374</td>
+                        
+                        <td class="value ">375</td>
+                        
+                        <td class="value ">375</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Average baseline minus perturbation score difference." tabindex="0" aria-label="Average baseline minus perturbation score difference.">
+      <span class="help-text">Δ</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value ">0.018</td>
+                        
+                        <td class="value ">0.008</td>
+                        
+                        <td class="value ">0.016</td>
+                        
+                        <td class="value ">0.033</td>
+                        
+                        <td class="value ">0.002</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Paired t-test p-value for baseline versus perturbation differences." tabindex="0" aria-label="Paired t-test p-value for baseline versus perturbation differences.">
+      <span class="help-text">Paired t-test p-value</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value muted">0.096</td>
+                        
+                        <td class="value good">0.032</td>
+                        
+                        <td class="value muted">0.112</td>
+                        
+                        <td class="value good">0.011</td>
+                        
+                        <td class="value muted">0.883</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Wilcoxon signed-rank p-value for paired differences." tabindex="0" aria-label="Wilcoxon signed-rank p-value for paired differences.">
+      <span class="help-text">Wilcoxon p-value</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value muted">0.098</td>
+                        
+                        <td class="value good">0.042</td>
+                        
+                        <td class="value muted">0.088</td>
+                        
+                        <td class="value good">0.005</td>
+                        
+                        <td class="value muted">0.662</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Permutation test p-value for paired differences." tabindex="0" aria-label="Permutation test p-value for paired differences.">
+      <span class="help-text">Permutation p-value</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value muted">0.100</td>
+                        
+                        <td class="value good">0.050</td>
+                        
+                        <td class="value muted">0.134</td>
+                        
+                        <td class="value good">0.012</td>
+                        
+                        <td class="value muted">0.925</td>
+                        
+                      </tr>
+                      
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+              
+            </div>
+          </div>
+          
+          <div class="stat-scope" data-stat-scope="__total__">
+            <div class="group-grid">
+              
+              <section class="group-card">
+                <h4>Paraphrased vs Base</h4>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Metric</th>
+                        
+                        <th>Claude Haiku 4.5</th>
+                        
+                        <th>Claude Opus 4</th>
+                        
+                        <th>Claude Opus 4.5</th>
+                        
+                        <th>Claude Sonnet 4.6</th>
+                        
+                        <th>GPT OSS 120B</th>
+                        
+                      </tr>
+                    </thead>
+                    <tbody>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Number of paired observations used by the statistical test." tabindex="0" aria-label="Number of paired observations used by the statistical test.">
+      <span class="help-text">N</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value ">373</td>
+                        
+                        <td class="value ">373</td>
+                        
+                        <td class="value ">374</td>
+                        
+                        <td class="value ">375</td>
+                        
+                        <td class="value ">375</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Average baseline minus perturbation score difference." tabindex="0" aria-label="Average baseline minus perturbation score difference.">
+      <span class="help-text">Δ</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value ">0.044</td>
+                        
+                        <td class="value ">-0.003</td>
+                        
+                        <td class="value ">0.067</td>
+                        
+                        <td class="value ">-0.070</td>
+                        
+                        <td class="value ">-0.051</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Paired t-test p-value for baseline versus perturbation differences." tabindex="0" aria-label="Paired t-test p-value for baseline versus perturbation differences.">
+      <span class="help-text">Paired t-test p-value</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value muted">0.151</td>
+                        
+                        <td class="value muted">0.873</td>
+                        
+                        <td class="value good">0.011</td>
+                        
+                        <td class="value muted">0.109</td>
+                        
+                        <td class="value muted">0.265</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Wilcoxon signed-rank p-value for paired differences." tabindex="0" aria-label="Wilcoxon signed-rank p-value for paired differences.">
+      <span class="help-text">Wilcoxon p-value</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value muted">0.170</td>
+                        
+                        <td class="value muted">0.554</td>
+                        
+                        <td class="value good">0.002</td>
+                        
+                        <td class="value muted">0.434</td>
+                        
+                        <td class="value muted">0.150</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Permutation test p-value for paired differences." tabindex="0" aria-label="Permutation test p-value for paired differences.">
+      <span class="help-text">Permutation p-value</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value muted">0.128</td>
+                        
+                        <td class="value muted">0.821</td>
+                        
+                        <td class="value good">0.024</td>
+                        
+                        <td class="value muted">0.116</td>
+                        
+                        <td class="value muted">0.280</td>
+                        
+                      </tr>
+                      
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+              
+              <section class="group-card">
+                <h4>Deleted vs Base</h4>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Metric</th>
+                        
+                        <th>Claude Haiku 4.5</th>
+                        
+                        <th>Claude Opus 4</th>
+                        
+                        <th>Claude Opus 4.5</th>
+                        
+                        <th>Claude Sonnet 4.6</th>
+                        
+                        <th>GPT OSS 120B</th>
+                        
+                      </tr>
+                    </thead>
+                    <tbody>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Number of paired observations used by the statistical test." tabindex="0" aria-label="Number of paired observations used by the statistical test.">
+      <span class="help-text">N</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value ">373</td>
+                        
+                        <td class="value ">373</td>
+                        
+                        <td class="value ">374</td>
+                        
+                        <td class="value ">375</td>
+                        
+                        <td class="value ">375</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Average baseline minus perturbation score difference." tabindex="0" aria-label="Average baseline minus perturbation score difference.">
+      <span class="help-text">Δ</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value ">0.032</td>
+                        
+                        <td class="value ">-0.053</td>
+                        
+                        <td class="value ">-0.039</td>
+                        
+                        <td class="value ">0.016</td>
+                        
+                        <td class="value ">0.001</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Paired t-test p-value for baseline versus perturbation differences." tabindex="0" aria-label="Paired t-test p-value for baseline versus perturbation differences.">
+      <span class="help-text">Paired t-test p-value</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value muted">0.291</td>
+                        
+                        <td class="value good">0.018</td>
+                        
+                        <td class="value muted">0.156</td>
+                        
+                        <td class="value muted">0.713</td>
+                        
+                        <td class="value muted">0.983</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Wilcoxon signed-rank p-value for paired differences." tabindex="0" aria-label="Wilcoxon signed-rank p-value for paired differences.">
+      <span class="help-text">Wilcoxon p-value</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value muted">0.399</td>
+                        
+                        <td class="value good">0.015</td>
+                        
+                        <td class="value good">0.020</td>
+                        
+                        <td class="value muted">0.470</td>
+                        
+                        <td class="value muted">0.869</td>
+                        
+                      </tr>
+                      
+                      <tr>
+                        <td><span class="help-label" data-help="Permutation test p-value for paired differences." tabindex="0" aria-label="Permutation test p-value for paired differences.">
+      <span class="help-text">Permutation p-value</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                        
+                        <td class="value muted">0.284</td>
+                        
+                        <td class="value good">0.020</td>
+                        
+                        <td class="value muted">0.180</td>
+                        
+                        <td class="value muted">0.763</td>
+                        
+                        <td class="value muted">1.000</td>
+                        
+                      </tr>
+                      
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+              
+            </div>
+          </div>
+          
+        </div>
+      </details>
+
+      <div class="page-nav">
+        <button type="button" class="page-toggle" data-page-target="criteria" aria-label="Open criteria page">→</button>
+      </div>
+    </section>
+
+    <section class="report-page" data-page="criteria">
+      
+      <details class="section">
+        <summary>fed diverse</summary>
+        <div class="section-body">
+          <div class="group-grid">
+            
+            <section class="group-card">
+              <h4>Scoring Stability</h4>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Metric</th>
+                      
+                      <th>Claude Haiku 4.5</th>
+                      
+                      <th>Claude Opus 4</th>
+                      
+                      <th>Claude Opus 4.5</th>
+                      
+                      <th>Claude Sonnet 4.6</th>
+                      
+                      <th>GPT OSS 120B</th>
+                      
+                    </tr>
+                  </thead>
+                  <tbody>
+                    
+                    <tr>
+                      <td><span class="help-label" data-help="Mean absolute score shift when the same criterion is paraphrased, normalized by score scale span. Lower is better." tabindex="0" aria-label="Mean absolute score shift when the same criterion is paraphrased, normalized by score scale span. Lower is better.">
+      <span class="help-text">Score Stability</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                      
+                      <td class="value ">0.1139</td>
+                      
+                      <td class="value ">0.1046</td>
+                      
+                      <td class="value ">0.0439</td>
+                      
+                      <td class="value ">0.2363</td>
+                      
+                      <td class="value ">0.2395</td>
+                      
+                    </tr>
+                    
+                    <tr>
+                      <td><span class="help-label" data-help="Cross-criterion normalized MAD divided by same-criterion normalized MAD. Lower means paraphrasing stays more isolated to the intended criterion." tabindex="0" aria-label="Cross-criterion normalized MAD divided by same-criterion normalized MAD. Lower means paraphrasing stays more isolated to the intended criterion.">
+      <span class="help-text">Spillover</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                      
+                      <td class="value ">0.4551</td>
+                      
+                      <td class="value ">0.3222</td>
+                      
+                      <td class="value ">0.6585</td>
+                      
+                      <td class="value ">0.2327</td>
+                      
+                      <td class="value ">0.4535</td>
+                      
+                    </tr>
+                    
+                  </tbody>
+                </table>
+              </div>
+            </section>
+            
+            <section class="group-card">
+              <h4>Ranking Consistency</h4>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Metric</th>
+                      
+                      <th>Claude Haiku 4.5</th>
+                      
+                      <th>Claude Opus 4</th>
+                      
+                      <th>Claude Opus 4.5</th>
+                      
+                      <th>Claude Sonnet 4.6</th>
+                      
+                      <th>GPT OSS 120B</th>
+                      
+                    </tr>
+                  </thead>
+                  <tbody>
+                    
+                    <tr>
+                      <td><span class="help-label" data-help="Estimated share of ranking pairs that flip when the same criterion is paraphrased." tabindex="0" aria-label="Estimated share of ranking pairs that flip when the same criterion is paraphrased.">
+      <span class="help-text">Flips</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                      
+                      <td class="value ">0.9%</td>
+                      
+                      <td class="value ">0.2%</td>
+                      
+                      <td class="value ">0.2%</td>
+                      
+                      <td class="value ">1.2%</td>
+                      
+                      <td class="value ">3.0%</td>
+                      
+                    </tr>
+                    
+                    <tr>
+                      <td><span class="help-label" data-help="Average Kendall&#39;s tau-b between baseline ranking and same-criterion paraphrased ranking. Higher is better." tabindex="0" aria-label="Average Kendall&#39;s tau-b between baseline ranking and same-criterion paraphrased ranking. Higher is better.">
+      <span class="help-text">Ranking Stability</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                      
+                      <td class="value ">0.688</td>
+                      
+                      <td class="value ">0.592</td>
+                      
+                      <td class="value ">0.714</td>
+                      
+                      <td class="value ">0.544</td>
+                      
+                      <td class="value ">0.378</td>
+                      
+                    </tr>
+                    
+                    <tr>
+                      <td><span class="help-label" data-help="Share of example pairs that receive tied scores when the same criterion is paraphrased." tabindex="0" aria-label="Share of example pairs that receive tied scores when the same criterion is paraphrased.">
+      <span class="help-text">Ties</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                      
+                      <td class="value ">61.2%</td>
+                      
+                      <td class="value ">77.5%</td>
+                      
+                      <td class="value ">79.2%</td>
+                      
+                      <td class="value ">72.6%</td>
+                      
+                      <td class="value ">75.8%</td>
+                      
+                    </tr>
+                    
+                  </tbody>
+                </table>
+              </div>
+            </section>
+            
+          </div>
+        </div>
+      </details>
+      
+      <details class="section">
+        <summary>fed fluent</summary>
+        <div class="section-body">
+          <div class="group-grid">
+            
+            <section class="group-card">
+              <h4>Scoring Stability</h4>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Metric</th>
+                      
+                      <th>Claude Haiku 4.5</th>
+                      
+                      <th>Claude Opus 4</th>
+                      
+                      <th>Claude Opus 4.5</th>
+                      
+                      <th>Claude Sonnet 4.6</th>
+                      
+                      <th>GPT OSS 120B</th>
+                      
+                    </tr>
+                  </thead>
+                  <tbody>
+                    
+                    <tr>
+                      <td><span class="help-label" data-help="Mean absolute score shift when the same criterion is paraphrased, normalized by score scale span. Lower is better." tabindex="0" aria-label="Mean absolute score shift when the same criterion is paraphrased, normalized by score scale span. Lower is better.">
+      <span class="help-text">Score Stability</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                      
+                      <td class="value ">0.0670</td>
+                      
+                      <td class="value ">0.0134</td>
+                      
+                      <td class="value ">0.0866</td>
+                      
+                      <td class="value ">0.0944</td>
+                      
+                      <td class="value ">0.0891</td>
+                      
+                    </tr>
+                    
+                    <tr>
+                      <td><span class="help-label" data-help="Cross-criterion normalized MAD divided by same-criterion normalized MAD. Lower means paraphrasing stays more isolated to the intended criterion." tabindex="0" aria-label="Cross-criterion normalized MAD divided by same-criterion normalized MAD. Lower means paraphrasing stays more isolated to the intended criterion.">
+      <span class="help-text">Spillover</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                      
+                      <td class="value ">0.3336</td>
+                      
+                      <td class="value ">0.6358</td>
+                      
+                      <td class="value ">0.3290</td>
+                      
+                      <td class="value ">0.4757</td>
+                      
+                      <td class="value ">0.6749</td>
+                      
+                    </tr>
+                    
+                  </tbody>
+                </table>
+              </div>
+            </section>
+            
+            <section class="group-card">
+              <h4>Ranking Consistency</h4>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Metric</th>
+                      
+                      <th>Claude Haiku 4.5</th>
+                      
+                      <th>Claude Opus 4</th>
+                      
+                      <th>Claude Opus 4.5</th>
+                      
+                      <th>Claude Sonnet 4.6</th>
+                      
+                      <th>GPT OSS 120B</th>
+                      
+                    </tr>
+                  </thead>
+                  <tbody>
+                    
+                    <tr>
+                      <td><span class="help-label" data-help="Estimated share of ranking pairs that flip when the same criterion is paraphrased." tabindex="0" aria-label="Estimated share of ranking pairs that flip when the same criterion is paraphrased.">
+      <span class="help-text">Flips</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                      
+                      <td class="value ">0.4%</td>
+                      
+                      <td class="value ">0.0%</td>
+                      
+                      <td class="value ">0.3%</td>
+                      
+                      <td class="value ">0.5%</td>
+                      
+                      <td class="value ">0.6%</td>
+                      
+                    </tr>
+                    
+                    <tr>
+                      <td><span class="help-label" data-help="Average Kendall&#39;s tau-b between baseline ranking and same-criterion paraphrased ranking. Higher is better." tabindex="0" aria-label="Average Kendall&#39;s tau-b between baseline ranking and same-criterion paraphrased ranking. Higher is better.">
+      <span class="help-text">Ranking Stability</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                      
+                      <td class="value ">0.740</td>
+                      
+                      <td class="value ">0.935</td>
+                      
+                      <td class="value ">0.742</td>
+                      
+                      <td class="value ">0.736</td>
+                      
+                      <td class="value ">0.700</td>
+                      
+                    </tr>
+                    
+                    <tr>
+                      <td><span class="help-label" data-help="Share of example pairs that receive tied scores when the same criterion is paraphrased." tabindex="0" aria-label="Share of example pairs that receive tied scores when the same criterion is paraphrased.">
+      <span class="help-text">Ties</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                      
+                      <td class="value ">71.8%</td>
+                      
+                      <td class="value ">76.0%</td>
+                      
+                      <td class="value ">62.9%</td>
+                      
+                      <td class="value ">67.7%</td>
+                      
+                      <td class="value ">66.8%</td>
+                      
+                    </tr>
+                    
+                  </tbody>
+                </table>
+              </div>
+            </section>
+            
+          </div>
+        </div>
+      </details>
+      
+      <details class="section">
+        <summary>fed interesting</summary>
+        <div class="section-body">
+          <div class="group-grid">
+            
+            <section class="group-card">
+              <h4>Scoring Stability</h4>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Metric</th>
+                      
+                      <th>Claude Haiku 4.5</th>
+                      
+                      <th>Claude Opus 4</th>
+                      
+                      <th>Claude Opus 4.5</th>
+                      
+                      <th>Claude Sonnet 4.6</th>
+                      
+                      <th>GPT OSS 120B</th>
+                      
+                    </tr>
+                  </thead>
+                  <tbody>
+                    
+                    <tr>
+                      <td><span class="help-label" data-help="Mean absolute score shift when the same criterion is paraphrased, normalized by score scale span. Lower is better." tabindex="0" aria-label="Mean absolute score shift when the same criterion is paraphrased, normalized by score scale span. Lower is better.">
+      <span class="help-text">Score Stability</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                      
+                      <td class="value ">0.0489</td>
+                      
+                      <td class="value ">0.0257</td>
+                      
+                      <td class="value ">0.0262</td>
+                      
+                      <td class="value ">0.0485</td>
+                      
+                      <td class="value ">0.0803</td>
+                      
+                    </tr>
+                    
+                    <tr>
+                      <td><span class="help-label" data-help="Cross-criterion normalized MAD divided by same-criterion normalized MAD. Lower means paraphrasing stays more isolated to the intended criterion." tabindex="0" aria-label="Cross-criterion normalized MAD divided by same-criterion normalized MAD. Lower means paraphrasing stays more isolated to the intended criterion.">
+      <span class="help-text">Spillover</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                      
+                      <td class="value ">0.6719</td>
+                      
+                      <td class="value ">0.6669</td>
+                      
+                      <td class="value ">0.9673</td>
+                      
+                      <td class="value ">1.0231</td>
+                      
+                      <td class="value ">0.8977</td>
+                      
+                    </tr>
+                    
+                  </tbody>
+                </table>
+              </div>
+            </section>
+            
+            <section class="group-card">
+              <h4>Ranking Consistency</h4>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Metric</th>
+                      
+                      <th>Claude Haiku 4.5</th>
+                      
+                      <th>Claude Opus 4</th>
+                      
+                      <th>Claude Opus 4.5</th>
+                      
+                      <th>Claude Sonnet 4.6</th>
+                      
+                      <th>GPT OSS 120B</th>
+                      
+                    </tr>
+                  </thead>
+                  <tbody>
+                    
+                    <tr>
+                      <td><span class="help-label" data-help="Estimated share of ranking pairs that flip when the same criterion is paraphrased." tabindex="0" aria-label="Estimated share of ranking pairs that flip when the same criterion is paraphrased.">
+      <span class="help-text">Flips</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                      
+                      <td class="value ">0.4%</td>
+                      
+                      <td class="value ">0.1%</td>
+                      
+                      <td class="value ">0.1%</td>
+                      
+                      <td class="value ">0.3%</td>
+                      
+                      <td class="value ">1.0%</td>
+                      
+                    </tr>
+                    
+                    <tr>
+                      <td><span class="help-label" data-help="Average Kendall&#39;s tau-b between baseline ranking and same-criterion paraphrased ranking. Higher is better." tabindex="0" aria-label="Average Kendall&#39;s tau-b between baseline ranking and same-criterion paraphrased ranking. Higher is better.">
+      <span class="help-text">Ranking Stability</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                      
+                      <td class="value ">0.872</td>
+                      
+                      <td class="value ">0.922</td>
+                      
+                      <td class="value ">0.912</td>
+                      
+                      <td class="value ">0.877</td>
+                      
+                      <td class="value ">0.697</td>
+                      
+                    </tr>
+                    
+                    <tr>
+                      <td><span class="help-label" data-help="Share of example pairs that receive tied scores when the same criterion is paraphrased." tabindex="0" aria-label="Share of example pairs that receive tied scores when the same criterion is paraphrased.">
+      <span class="help-text">Ties</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                      
+                      <td class="value ">48.3%</td>
+                      
+                      <td class="value ">49.1%</td>
+                      
+                      <td class="value ">50.6%</td>
+                      
+                      <td class="value ">60.6%</td>
+                      
+                      <td class="value ">62.8%</td>
+                      
+                    </tr>
+                    
+                  </tbody>
+                </table>
+              </div>
+            </section>
+            
+          </div>
+        </div>
+      </details>
+      
+      <details class="section">
+        <summary>fed likeable</summary>
+        <div class="section-body">
+          <div class="group-grid">
+            
+            <section class="group-card">
+              <h4>Scoring Stability</h4>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Metric</th>
+                      
+                      <th>Claude Haiku 4.5</th>
+                      
+                      <th>Claude Opus 4</th>
+                      
+                      <th>Claude Opus 4.5</th>
+                      
+                      <th>Claude Sonnet 4.6</th>
+                      
+                      <th>GPT OSS 120B</th>
+                      
+                    </tr>
+                  </thead>
+                  <tbody>
+                    
+                    <tr>
+                      <td><span class="help-label" data-help="Mean absolute score shift when the same criterion is paraphrased, normalized by score scale span. Lower is better." tabindex="0" aria-label="Mean absolute score shift when the same criterion is paraphrased, normalized by score scale span. Lower is better.">
+      <span class="help-text">Score Stability</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                      
+                      <td class="value ">0.0674</td>
+                      
+                      <td class="value ">0.0510</td>
+                      
+                      <td class="value ">0.0324</td>
+                      
+                      <td class="value ">0.1293</td>
+                      
+                      <td class="value ">0.1072</td>
+                      
+                    </tr>
+                    
+                    <tr>
+                      <td><span class="help-label" data-help="Cross-criterion normalized MAD divided by same-criterion normalized MAD. Lower means paraphrasing stays more isolated to the intended criterion." tabindex="0" aria-label="Cross-criterion normalized MAD divided by same-criterion normalized MAD. Lower means paraphrasing stays more isolated to the intended criterion.">
+      <span class="help-text">Spillover</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                      
+                      <td class="value ">0.6724</td>
+                      
+                      <td class="value ">0.5521</td>
+                      
+                      <td class="value ">0.8446</td>
+                      
+                      <td class="value ">0.5064</td>
+                      
+                      <td class="value ">0.9587</td>
+                      
+                    </tr>
+                    
+                  </tbody>
+                </table>
+              </div>
+            </section>
+            
+            <section class="group-card">
+              <h4>Ranking Consistency</h4>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Metric</th>
+                      
+                      <th>Claude Haiku 4.5</th>
+                      
+                      <th>Claude Opus 4</th>
+                      
+                      <th>Claude Opus 4.5</th>
+                      
+                      <th>Claude Sonnet 4.6</th>
+                      
+                      <th>GPT OSS 120B</th>
+                      
+                    </tr>
+                  </thead>
+                  <tbody>
+                    
+                    <tr>
+                      <td><span class="help-label" data-help="Estimated share of ranking pairs that flip when the same criterion is paraphrased." tabindex="0" aria-label="Estimated share of ranking pairs that flip when the same criterion is paraphrased.">
+      <span class="help-text">Flips</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                      
+                      <td class="value ">0.5%</td>
+                      
+                      <td class="value ">0.1%</td>
+                      
+                      <td class="value ">0.1%</td>
+                      
+                      <td class="value ">0.7%</td>
+                      
+                      <td class="value ">1.2%</td>
+                      
+                    </tr>
+                    
+                    <tr>
+                      <td><span class="help-label" data-help="Average Kendall&#39;s tau-b between baseline ranking and same-criterion paraphrased ranking. Higher is better." tabindex="0" aria-label="Average Kendall&#39;s tau-b between baseline ranking and same-criterion paraphrased ranking. Higher is better.">
+      <span class="help-text">Ranking Stability</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                      
+                      <td class="value ">0.841</td>
+                      
+                      <td class="value ">0.870</td>
+                      
+                      <td class="value ">0.894</td>
+                      
+                      <td class="value ">0.781</td>
+                      
+                      <td class="value ">0.724</td>
+                      
+                    </tr>
+                    
+                    <tr>
+                      <td><span class="help-label" data-help="Share of example pairs that receive tied scores when the same criterion is paraphrased." tabindex="0" aria-label="Share of example pairs that receive tied scores when the same criterion is paraphrased.">
+      <span class="help-text">Ties</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                      
+                      <td class="value ">46.8%</td>
+                      
+                      <td class="value ">49.0%</td>
+                      
+                      <td class="value ">54.4%</td>
+                      
+                      <td class="value ">48.0%</td>
+                      
+                      <td class="value ">54.7%</td>
+                      
+                    </tr>
+                    
+                  </tbody>
+                </table>
+              </div>
+            </section>
+            
+          </div>
+        </div>
+      </details>
+      
+      <details class="section">
+        <summary>fed relevant</summary>
+        <div class="section-body">
+          <div class="group-grid">
+            
+            <section class="group-card">
+              <h4>Scoring Stability</h4>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Metric</th>
+                      
+                      <th>Claude Haiku 4.5</th>
+                      
+                      <th>Claude Opus 4</th>
+                      
+                      <th>Claude Opus 4.5</th>
+                      
+                      <th>Claude Sonnet 4.6</th>
+                      
+                      <th>GPT OSS 120B</th>
+                      
+                    </tr>
+                  </thead>
+                  <tbody>
+                    
+                    <tr>
+                      <td><span class="help-label" data-help="Mean absolute score shift when the same criterion is paraphrased, normalized by score scale span. Lower is better." tabindex="0" aria-label="Mean absolute score shift when the same criterion is paraphrased, normalized by score scale span. Lower is better.">
+      <span class="help-text">Score Stability</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                      
+                      <td class="value ">0.0358</td>
+                      
+                      <td class="value ">0.0249</td>
+                      
+                      <td class="value ">0.0318</td>
+                      
+                      <td class="value ">0.0349</td>
+                      
+                      <td class="value ">0.0957</td>
+                      
+                    </tr>
+                    
+                    <tr>
+                      <td><span class="help-label" data-help="Cross-criterion normalized MAD divided by same-criterion normalized MAD. Lower means paraphrasing stays more isolated to the intended criterion." tabindex="0" aria-label="Cross-criterion normalized MAD divided by same-criterion normalized MAD. Lower means paraphrasing stays more isolated to the intended criterion.">
+      <span class="help-text">Spillover</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                      
+                      <td class="value ">1.0374</td>
+                      
+                      <td class="value ">0.6970</td>
+                      
+                      <td class="value ">0.8555</td>
+                      
+                      <td class="value ">1.2229</td>
+                      
+                      <td class="value ">0.8735</td>
+                      
+                    </tr>
+                    
+                  </tbody>
+                </table>
+              </div>
+            </section>
+            
+            <section class="group-card">
+              <h4>Ranking Consistency</h4>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Metric</th>
+                      
+                      <th>Claude Haiku 4.5</th>
+                      
+                      <th>Claude Opus 4</th>
+                      
+                      <th>Claude Opus 4.5</th>
+                      
+                      <th>Claude Sonnet 4.6</th>
+                      
+                      <th>GPT OSS 120B</th>
+                      
+                    </tr>
+                  </thead>
+                  <tbody>
+                    
+                    <tr>
+                      <td><span class="help-label" data-help="Estimated share of ranking pairs that flip when the same criterion is paraphrased." tabindex="0" aria-label="Estimated share of ranking pairs that flip when the same criterion is paraphrased.">
+      <span class="help-text">Flips</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                      
+                      <td class="value ">0.2%</td>
+                      
+                      <td class="value ">0.1%</td>
+                      
+                      <td class="value ">0.1%</td>
+                      
+                      <td class="value ">0.1%</td>
+                      
+                      <td class="value ">1.1%</td>
+                      
+                    </tr>
+                    
+                    <tr>
+                      <td><span class="help-label" data-help="Average Kendall&#39;s tau-b between baseline ranking and same-criterion paraphrased ranking. Higher is better." tabindex="0" aria-label="Average Kendall&#39;s tau-b between baseline ranking and same-criterion paraphrased ranking. Higher is better.">
+      <span class="help-text">Ranking Stability</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                      
+                      <td class="value ">0.914</td>
+                      
+                      <td class="value ">0.915</td>
+                      
+                      <td class="value ">0.924</td>
+                      
+                      <td class="value ">0.901</td>
+                      
+                      <td class="value ">0.787</td>
+                      
+                    </tr>
+                    
+                    <tr>
+                      <td><span class="help-label" data-help="Share of example pairs that receive tied scores when the same criterion is paraphrased." tabindex="0" aria-label="Share of example pairs that receive tied scores when the same criterion is paraphrased.">
+      <span class="help-text">Ties</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                      
+                      <td class="value ">58.4%</td>
+                      
+                      <td class="value ">64.0%</td>
+                      
+                      <td class="value ">47.0%</td>
+                      
+                      <td class="value ">67.0%</td>
+                      
+                      <td class="value ">53.5%</td>
+                      
+                    </tr>
+                    
+                  </tbody>
+                </table>
+              </div>
+            </section>
+            
+          </div>
+        </div>
+      </details>
+      
+      <details class="section">
+        <summary>fed understandable</summary>
+        <div class="section-body">
+          <div class="group-grid">
+            
+            <section class="group-card">
+              <h4>Scoring Stability</h4>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Metric</th>
+                      
+                      <th>Claude Haiku 4.5</th>
+                      
+                      <th>Claude Opus 4</th>
+                      
+                      <th>Claude Opus 4.5</th>
+                      
+                      <th>Claude Sonnet 4.6</th>
+                      
+                      <th>GPT OSS 120B</th>
+                      
+                    </tr>
+                  </thead>
+                  <tbody>
+                    
+                    <tr>
+                      <td><span class="help-label" data-help="Mean absolute score shift when the same criterion is paraphrased, normalized by score scale span. Lower is better." tabindex="0" aria-label="Mean absolute score shift when the same criterion is paraphrased, normalized by score scale span. Lower is better.">
+      <span class="help-text">Score Stability</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                      
+                      <td class="value ">0.0134</td>
+                      
+                      <td class="value ">0.0054</td>
+                      
+                      <td class="value ">0.0275</td>
+                      
+                      <td class="value ">0.0216</td>
+                      
+                      <td class="value ">0.0341</td>
+                      
+                    </tr>
+                    
+                    <tr>
+                      <td><span class="help-label" data-help="Cross-criterion normalized MAD divided by same-criterion normalized MAD. Lower means paraphrasing stays more isolated to the intended criterion." tabindex="0" aria-label="Cross-criterion normalized MAD divided by same-criterion normalized MAD. Lower means paraphrasing stays more isolated to the intended criterion.">
+      <span class="help-text">Spillover</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                      
+                      <td class="value ">1.5755</td>
+                      
+                      <td class="value ">0.5102</td>
+                      
+                      <td class="value ">0.7670</td>
+                      
+                      <td class="value ">1.3704</td>
+                      
+                      <td class="value ">1.0312</td>
+                      
+                    </tr>
+                    
+                  </tbody>
+                </table>
+              </div>
+            </section>
+            
+            <section class="group-card">
+              <h4>Ranking Consistency</h4>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Metric</th>
+                      
+                      <th>Claude Haiku 4.5</th>
+                      
+                      <th>Claude Opus 4</th>
+                      
+                      <th>Claude Opus 4.5</th>
+                      
+                      <th>Claude Sonnet 4.6</th>
+                      
+                      <th>GPT OSS 120B</th>
+                      
+                    </tr>
+                  </thead>
+                  <tbody>
+                    
+                    <tr>
+                      <td><span class="help-label" data-help="Estimated share of ranking pairs that flip when the same criterion is paraphrased." tabindex="0" aria-label="Estimated share of ranking pairs that flip when the same criterion is paraphrased.">
+      <span class="help-text">Flips</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                      
+                      <td class="value ">0.0%</td>
+                      
+                      <td class="value ">0.0%</td>
+                      
+                      <td class="value ">0.1%</td>
+                      
+                      <td class="value ">0.1%</td>
+                      
+                      <td class="value ">0.2%</td>
+                      
+                    </tr>
+                    
+                    <tr>
+                      <td><span class="help-label" data-help="Average Kendall&#39;s tau-b between baseline ranking and same-criterion paraphrased ranking. Higher is better." tabindex="0" aria-label="Average Kendall&#39;s tau-b between baseline ranking and same-criterion paraphrased ranking. Higher is better.">
+      <span class="help-text">Ranking Stability</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                      
+                      <td class="value ">0.906</td>
+                      
+                      <td class="value ">0.979</td>
+                      
+                      <td class="value ">0.855</td>
+                      
+                      <td class="value ">0.916</td>
+                      
+                      <td class="value ">0.747</td>
+                      
+                    </tr>
+                    
+                    <tr>
+                      <td><span class="help-label" data-help="Share of example pairs that receive tied scores when the same criterion is paraphrased." tabindex="0" aria-label="Share of example pairs that receive tied scores when the same criterion is paraphrased.">
+      <span class="help-text">Ties</span>
+      <span class="help-icon">i</span>
+    </span></td>
+                      
+                      <td class="value ">81.4%</td>
+                      
+                      <td class="value ">84.5%</td>
+                      
+                      <td class="value ">71.6%</td>
+                      
+                      <td class="value ">76.1%</td>
+                      
+                      <td class="value ">82.7%</td>
+                      
+                    </tr>
+                    
+                  </tbody>
+                </table>
+              </div>
+            </section>
+            
+          </div>
+        </div>
+      </details>
+      
+
+      <div class="page-nav">
+        <button type="button" class="page-toggle" data-page-target="overview" aria-label="Back to overview">←</button>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    window.__FAIR_J_CALC__ = {"Claude Haiku 4.5": 0.05774201158406409, "Claude Opus 4": 0.0374991419178894, "Claude Opus 4.5": 0.04139928698752228, "Claude Sonnet 4.6": 0.09417777777777779, "GPT OSS 120B": 0.10764444444444445};
+    function setOpen(selector, openState) { document.querySelectorAll(selector).forEach(function(el) { el.open = openState; }); }
+    document.querySelector('[data-open-all="section"]').addEventListener('click', function() { setOpen('details.section', true); });
+    document.querySelector('[data-close-all="section"]').addEventListener('click', function() { setOpen('details.section', false); });
+    function showPage(pageName) {
+      document.querySelectorAll('[data-page]').forEach(function(node) {
+        node.classList.toggle('is-active', node.dataset.page === pageName);
+      });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    document.querySelectorAll('[data-page-target]').forEach(function(button) {
+      button.addEventListener('click', function() { showPage(button.dataset.pageTarget); });
+    });
+    var statSelect = document.querySelector('[data-stat-combined-select]');
+    if (statSelect) {
+      statSelect.addEventListener('change', function(event) {
+        document.querySelectorAll('.stat-scope').forEach(function(node) {
+          node.classList.toggle('is-active', node.dataset.statScope === event.target.value);
+        });
+      });
+    }
+    function updateCalc() {
+      var input = document.getElementById('calc-n');
+      var target = document.getElementById('calc-results');
+      if (!input || !target) { return; }
+      var n = Math.max(1, parseInt(input.value || '1', 10) || 1);
+      var htmlParts = [];
+      Object.keys(window.__FAIR_J_CALC__).forEach(function(model) {
+        var std = window.__FAIR_J_CALC__[model];
+        var noise = (std / Math.sqrt(n)).toFixed(3);
+        htmlParts.push('<div class="calc-result-card"><div class="calc-model">' + model + '</div><strong class="calc-noise">±' + noise + '</strong></div>');
+      });
+      target.innerHTML = htmlParts.join('');
+    }
+    var calcInput = document.getElementById('calc-n');
+    if (calcInput) { calcInput.addEventListener('input', updateCalc); updateCalc(); }
+
+    var tooltip = document.createElement('div');
+    tooltip.className = 'app-tooltip';
+    document.body.appendChild(tooltip);
+
+    function hideTooltip() {
+      tooltip.classList.remove('is-visible');
+    }
+
+    function positionTooltip(target) {
+      var rect = target.getBoundingClientRect();
+      var top = rect.bottom + 10;
+      var left = rect.left + (rect.width / 2);
+      tooltip.style.top = top + 'px';
+      tooltip.style.left = left + 'px';
+      tooltip.style.transform = 'translate(-50%, 0)';
+      requestAnimationFrame(function() {
+        var tipRect = tooltip.getBoundingClientRect();
+        var clampedLeft = Math.min(
+          window.innerWidth - tipRect.width / 2 - 12,
+          Math.max(tipRect.width / 2 + 12, left)
+        );
+        var adjustedTop = top;
+        if (tipRect.bottom > window.innerHeight - 12) {
+          adjustedTop = rect.top - tipRect.height - 10;
+        }
+        tooltip.style.left = clampedLeft + 'px';
+        tooltip.style.top = Math.max(12, adjustedTop) + 'px';
+      });
+    }
+
+    function showTooltip(target) {
+      var text = target.getAttribute('data-help');
+      if (!text) { return; }
+      tooltip.textContent = text;
+      tooltip.classList.add('is-visible');
+      positionTooltip(target);
+    }
+
+    document.querySelectorAll('.help-label[data-help]').forEach(function(node) {
+      node.addEventListener('mouseenter', function() { showTooltip(node); });
+      node.addEventListener('mousemove', function() { positionTooltip(node); });
+      node.addEventListener('mouseleave', hideTooltip);
+      node.addEventListener('focus', function() { showTooltip(node); });
+      node.addEventListener('blur', hideTooltip);
+    });
+  </script>
+</body>
+</html>
