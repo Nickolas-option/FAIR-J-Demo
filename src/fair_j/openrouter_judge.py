@@ -56,6 +56,39 @@ def build_judge_response_format(expected_ids: set[str]) -> dict[str, object]:
     }
 
 
+def build_judge_tool_config(expected_ids: set[str]) -> dict[str, object]:
+    sorted_ids = sorted(expected_ids)
+    return {
+        "tools": [
+            {
+                "toolSpec": {
+                    "name": "report_scores",
+                    "description": "Return one integer score per rubric criterion.",
+                    "inputSchema": {
+                        "json": {
+                            "type": "object",
+                            "properties": {
+                                "scores": {
+                                    "type": "object",
+                                    "properties": {
+                                        criterion_id: {"type": "integer"}
+                                        for criterion_id in sorted_ids
+                                    },
+                                    "required": sorted_ids,
+                                    "additionalProperties": False,
+                                }
+                            },
+                            "required": ["scores"],
+                            "additionalProperties": False,
+                        }
+                    },
+                }
+            }
+        ],
+        "toolChoice": {"tool": {"name": "report_scores"}},
+    }
+
+
 def build_openrouter_provider_preferences(adapter_input: AdapterInput) -> dict[str, object] | None:
     provider: dict[str, object] = {
         # OpenRouter structured-output docs recommend requiring providers
@@ -156,14 +189,12 @@ def call_bedrock_judge(
                 system=[{"text": build_judge_system_prompt()}],
                 messages=[{"role": "user", "content": [{"text": prompt_text}]}],
                 inferenceConfig=inference_config,
+                toolConfig=build_judge_tool_config(expected_ids),
             )
-            content = strip_markdown_fences(extract_bedrock_text(response))
-            payload = json.loads(content)
-            if not isinstance(payload, dict):
-                raise ValueError("Bedrock judge response is not a JSON object.")
+            payload = extract_bedrock_tool_input(response)
             scores = extract_scores_payload(payload)
             if not isinstance(scores, dict):
-                raise ValueError("Bedrock judge response does not contain an object under 'scores'.")
+                raise ValueError("Bedrock tool input did not contain an object under 'scores'.")
             numeric_scores: dict[str, float] = {}
             for criterion_id, score in scores.items():
                 numeric_scores[str(criterion_id)] = float(score)
@@ -373,6 +404,19 @@ def extract_bedrock_text(response: dict) -> str:
             return text
     stop_reason = response.get("stopReason", "unknown")
     raise ValueError(f"Bedrock response contained no text content (stopReason={stop_reason!r}).")
+
+
+def extract_bedrock_tool_input(response: dict) -> dict:
+    for block in response.get("output", {}).get("message", {}).get("content", []):
+        tool_use = block.get("toolUse")
+        if isinstance(tool_use, dict) and tool_use.get("name") == "report_scores":
+            tool_input = tool_use.get("input")
+            if isinstance(tool_input, dict):
+                return tool_input
+    stop_reason = response.get("stopReason", "unknown")
+    raise ValueError(
+        f"Bedrock response did not contain a 'report_scores' tool use (stopReason={stop_reason!r})."
+    )
 
 
 def report_retry_error(
