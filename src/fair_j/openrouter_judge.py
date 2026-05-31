@@ -182,7 +182,7 @@ def call_bedrock_judge(
     for attempt in range(1, BEDROCK_JUDGE_MAX_RETRIES + 1):
         try:
             inference_config: dict[str, object] = {"maxTokens": 4096}
-            if "opus-4-7" not in bedrock_model_id:
+            if not any(tag in bedrock_model_id for tag in ("opus-4-7", "opus-4-8")):
                 inference_config["temperature"] = 0
             response = client.converse(
                 modelId=bedrock_model_id,

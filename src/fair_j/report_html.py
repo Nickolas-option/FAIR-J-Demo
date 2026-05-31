@@ -595,6 +595,7 @@ def build_short_label(judge_model: str) -> str:
         "bedrock/claude-opus-4": "Claude Opus 4",
         "bedrock/claude-opus-4-5": "Claude Opus 4.5",
         "bedrock/claude-opus-4-7": "Claude Opus 4.7",
+        "bedrock/claude-opus-4-8": "Claude Opus 4.8",
         "bedrock/claude-sonnet-4-6": "Claude Sonnet 4.6",
         "bedrock/gpt-oss-120b": "GPT OSS 120B",
     }

@@ -20,6 +20,7 @@ BEDROCK_ALIAS_TO_MODEL_ID: dict[str, str] = {
     "claude-opus-4": "us.anthropic.claude-opus-4-20250514-v1:0",
     "claude-opus-4-5": "us.anthropic.claude-opus-4-5-20251101-v1:0",
     "claude-opus-4-7": "us.anthropic.claude-opus-4-7",
+    "claude-opus-4-8": "us.anthropic.claude-opus-4-8",
     "gpt-oss-120b": "openai.gpt-oss-120b-1:0",
 }
 
