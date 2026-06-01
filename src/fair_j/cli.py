@@ -95,7 +95,7 @@ def add_pipeline_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--candidate-column", default="candidate")
     parser.add_argument("--provider")
     parser.add_argument("--provider-quantization")
-    parser.add_argument("--request-timeout", type=float, default=90.0)
+    parser.add_argument("--request-timeout", type=float, default=300.0)
     parser.add_argument("--subset-name")
     parser.add_argument("--run-dir", type=Path)
     parser.add_argument("--variants-path", type=Path)
@@ -103,6 +103,7 @@ def add_pipeline_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--paraphrases-per-criterion", type=int)
     parser.add_argument("--workers", type=int, default=25)
     parser.add_argument("--no-progress", action="store_true")
+    parser.add_argument("--limit-examples", type=int, default=None)
 
 
 def add_multi_pipeline_arguments(parser: argparse.ArgumentParser) -> None:
@@ -118,13 +119,14 @@ def add_multi_pipeline_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--candidate-column", default="candidate")
     parser.add_argument("--provider")
     parser.add_argument("--provider-quantization")
-    parser.add_argument("--request-timeout", type=float, default=90.0)
+    parser.add_argument("--request-timeout", type=float, default=300.0)
     parser.add_argument("--subset-name")
     parser.add_argument("--variants-path", type=Path)
     parser.add_argument("--seeds", type=int, default=1)
     parser.add_argument("--paraphrases-per-criterion", type=int)
     parser.add_argument("--workers", type=int, default=25)
     parser.add_argument("--no-progress", action="store_true")
+    parser.add_argument("--limit-examples", type=int, default=None)
 
 
 def cmd_make_variants(args: argparse.Namespace) -> None:
@@ -277,6 +279,7 @@ def cmd_run_multi_evaluation(args: argparse.Namespace) -> None:
             variants_path=shared_variants_path,
             workers=args.workers,
             progress_callback=progress_callback,
+            limit=args.limit_examples,
         )
         print(f"[{judge_model}] Prepared run in {run_dir}")
         print(
@@ -385,6 +388,7 @@ def run_adapter_from_args(args: argparse.Namespace) -> dict[str, int | str]:
         variants_path=args.variants_path,
         workers=args.workers,
         progress_callback=None if args.no_progress else build_progress_callback(),
+        limit=args.limit_examples,
     )
 
 

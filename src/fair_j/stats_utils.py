@@ -172,7 +172,7 @@ def paired_permutation_test(differences: list[float]) -> float | None:
         return None
 
     values = np.asarray(differences, dtype=float)
-    n_resamples = np.inf if len(values) <= 20 else 10000
+    n_resamples = np.inf if len(values) <= 20 else 1000
     result = permutation_test(
         data=(values,),
         statistic=mean_statistic,
@@ -257,15 +257,14 @@ def paired_mde_effect_size_dz(
 ) -> float | None:
     if n_pairs < 2:
         return None
-    return float(
-        _TTEST_POWER_ANALYSIS.solve_power(
-            effect_size=None,
-            nobs=n_pairs,
-            alpha=alpha,
-            power=power,
-            alternative="two-sided",
-        )
+    result = _TTEST_POWER_ANALYSIS.solve_power(
+        effect_size=None,
+        nobs=n_pairs,
+        alpha=alpha,
+        power=power,
+        alternative="two-sided",
     )
+    return float(np.asarray(result).item())
 
 
 def scale_effect_size_to_mean_difference(

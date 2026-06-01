@@ -46,6 +46,7 @@ def run_judge(
     variants_path: Path | None = None,
     workers: int = 10,
     progress_callback: Callable[[int, int], None] | None = None,
+    limit: int | None = None,
 ) -> dict[str, int | str]:
     if paraphrases_per_criterion is not None and paraphrases_per_criterion < 1:
         raise SystemExit("--paraphrases-per-criterion must be at least 1.")
@@ -55,6 +56,7 @@ def run_judge(
         id_column=adapter_input.dataset_id_column,
         context_column=adapter_input.dataset_context_column,
         candidate_column=adapter_input.dataset_candidate_column,
+        limit=limit,
     )
     rubric = load_rubric(adapter_input.rubric_path)
 
@@ -259,6 +261,7 @@ def run_pending_calls(
     total_calls: int,
 ) -> int:
     completed_futures = 0
+    failed_calls = 0
 
     with ThreadPoolExecutor(max_workers=workers) as executor:
         future_to_call = {}
@@ -277,9 +280,22 @@ def run_pending_calls(
             pending_call = future_to_call[future]
             try:
                 scores_and_output = future.result()
-            except Exception:
+            except Exception as error:
+                failed_calls += 1
                 report_call_event("failed", pending_call)
-                raise
+                error_name = type(error).__name__
+                error_message = " ".join(str(error).split())
+                sys.stderr.write(
+                    f"\n[skipped] {format_pending_call_label(pending_call)} "
+                    f"after exhausting retries: {error_name}: {error_message}\n"
+                )
+                sys.stderr.flush()
+                report_progress(
+                    progress_callback,
+                    initial_completed + completed_futures + failed_calls,
+                    total_calls,
+                )
+                continue
 
             completed_futures += 1
             write_completed_call(
