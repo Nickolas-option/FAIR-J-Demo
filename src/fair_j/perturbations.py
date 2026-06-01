@@ -16,7 +16,7 @@ from fair_j.schemas import Criterion, Rubric, RubricVariant
 
 
 PARAPHRASE_REQUEST_TIMEOUT_SECONDS = 90.0
-PARAPHRASE_MAX_RETRIES = 5
+PARAPHRASE_MAX_RETRIES = 10
 
 
 def make_variants(
@@ -66,6 +66,7 @@ def make_paraphrase_variants(
 
     variants: list[RubricVariant] = []
     for index, criterion in enumerate(rubric.criteria, start=1):
+        seen_paraphrases: set[str] = set()
         for paraphrase_index in range(1, paraphrases_per_criterion + 1):
             criteria = _clone_criteria(rubric.criteria)
             criteria[index - 1].text = paraphrase_criterion_text(
@@ -77,7 +78,9 @@ def make_paraphrase_variants(
                 openai_api_key=openai_api_key,
                 anthropic_api_key=anthropic_api_key,
                 bedrock_region=bedrock_region,
+                forbidden_texts=seen_paraphrases | {criterion.text},
             )
+            seen_paraphrases.add(criteria[index - 1].text)
             variants.append(
                 RubricVariant(
                     perturbation=f"paraphrase__{criterion.id}__{paraphrase_index:02d}",
@@ -97,6 +100,7 @@ def paraphrase_criterion_text(
     openai_api_key: str | None = None,
     anthropic_api_key: str | None = None,
     bedrock_region: str = "us-east-1",
+    forbidden_texts: set[str] | None = None,
 ) -> str:
     provider = infer_model_provider(paraphrase_model)
     if provider == "openai":
@@ -112,6 +116,7 @@ def paraphrase_criterion_text(
     )
 
     last_error: Exception | None = None
+    last_paraphrase: str = ""
     for _ in range(PARAPHRASE_MAX_RETRIES):
         try:
             completion = create_paraphrase_completion(
@@ -123,14 +128,24 @@ def paraphrase_criterion_text(
                 bedrock_region=bedrock_region,
             )
             paraphrase = normalize_paraphrase_output(completion_text(completion))
-            if paraphrase and paraphrase != criterion_text:
-                return paraphrase
             if paraphrase:
+                last_paraphrase = paraphrase
+            if not paraphrase:
+                raise ValueError("Paraphrase model returned an empty criterion.")
+            if forbidden_texts and paraphrase in forbidden_texts:
+                raise ValueError(
+                    f"Paraphrase model returned a duplicate criterion for '{criterion_id}'."
+                )
+            if paraphrase != criterion_text:
                 return paraphrase
-            raise ValueError("Paraphrase model returned an empty criterion.")
+            raise ValueError(
+                f"Paraphrase model returned the original criterion for '{criterion_id}'."
+            )
         except Exception as error:
             last_error = error
 
+    if last_paraphrase:
+        return last_paraphrase
     raise RuntimeError(
         f"Failed to paraphrase criterion '{criterion_id}' with model '{paraphrase_model}' "
         f"after {PARAPHRASE_MAX_RETRIES} attempts."
@@ -158,7 +173,7 @@ def create_paraphrase_completion(
                 "Do not add explanations, bullet points, or quotes."
             )}],
             messages=[{"role": "user", "content": [{"text": prompt}]}],
-            inferenceConfig={"maxTokens": 1024, "temperature": 0},
+            inferenceConfig={"maxTokens": 1024, "temperature": 1},
         )
         content = response["output"]["message"]["content"][0]["text"]
         result = SimpleNamespace()
@@ -174,7 +189,7 @@ def create_paraphrase_completion(
         return client.messages.create(
             model=paraphrase_model.removeprefix("anthropic/"),
             max_tokens=1024,
-            temperature=0,
+            temperature=1,
             system=(
                 "You rewrite evaluation rubric criteria. "
                 "Return exactly one paraphrased criterion sentence. "
@@ -193,7 +208,7 @@ def create_paraphrase_completion(
     )
     kwargs = {
         "model": paraphrase_model.removeprefix("openai/") if provider == "openai" else paraphrase_model,
-        "temperature": 0,
+        "temperature": 1,
         "messages": [
             {
                 "role": "system",
