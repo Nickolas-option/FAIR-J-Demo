@@ -8,7 +8,7 @@ from fair_j.schemas import Criterion, Rubric, RubricVariant
 
 
 PARAPHRASE_REQUEST_TIMEOUT_SECONDS = 90.0
-PARAPHRASE_MAX_RETRIES = 5
+PARAPHRASE_MAX_RETRIES = 10
 
 
 def make_variants(
@@ -100,10 +100,10 @@ def paraphrase_criterion_text(
         rubric_name=rubric_name,
         criterion_id=criterion_id,
         criterion_text=criterion_text,
-        forbidden_texts=forbidden_texts or set(),
     )
 
     last_error: Exception | None = None
+    last_paraphrase: str = ""
     for _ in range(PARAPHRASE_MAX_RETRIES):
         try:
             completion = create_paraphrase_completion(
@@ -114,6 +114,8 @@ def paraphrase_criterion_text(
                 prompt=prompt,
             )
             paraphrase = normalize_paraphrase_output(completion_text(completion))
+            if paraphrase:
+                last_paraphrase = paraphrase
             if not paraphrase:
                 raise ValueError("Paraphrase model returned an empty criterion.")
             if forbidden_texts and paraphrase in forbidden_texts:
@@ -128,6 +130,8 @@ def paraphrase_criterion_text(
         except Exception as error:
             last_error = error
 
+    if last_paraphrase:
+        return last_paraphrase
     raise RuntimeError(
         f"Failed to paraphrase criterion '{criterion_id}' with model '{paraphrase_model}' "
         f"after {PARAPHRASE_MAX_RETRIES} attempts."
@@ -219,21 +223,14 @@ def build_paraphrase_prompt(
     rubric_name: str,
     criterion_id: str,
     criterion_text: str,
-    forbidden_texts: set[str],
 ) -> str:
-    prompt = (
+    return (
         f"Rubric: {rubric_name}\n"
         f"Criterion id: {criterion_id}\n"
         f"Original criterion:\n{criterion_text}\n\n"
         "Rewrite this criterion in different wording while preserving the same evaluation meaning. "
         "Keep it as one criterion text only."
     )
-    if forbidden_texts:
-        prompt += (
-            "\nDo not return any of these existing phrasings:\n"
-            + "\n".join(f"- {text}" for text in sorted(forbidden_texts))
-        )
-    return prompt
 
 
 def normalize_paraphrase_output(content: str | None) -> str:
