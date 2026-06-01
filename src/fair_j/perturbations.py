@@ -55,6 +55,7 @@ def make_paraphrase_variants(
 
     variants: list[RubricVariant] = []
     for index, criterion in enumerate(rubric.criteria, start=1):
+        seen_paraphrases: set[str] = set()
         for paraphrase_index in range(1, paraphrases_per_criterion + 1):
             criteria = _clone_criteria(rubric.criteria)
             criteria[index - 1].text = paraphrase_criterion_text(
@@ -65,7 +66,9 @@ def make_paraphrase_variants(
                 openrouter_api_key=openrouter_api_key,
                 openai_api_key=openai_api_key,
                 anthropic_api_key=anthropic_api_key,
+                forbidden_texts=seen_paraphrases | {criterion.text},
             )
+            seen_paraphrases.add(criteria[index - 1].text)
             variants.append(
                 RubricVariant(
                     perturbation=f"paraphrase__{criterion.id}__{paraphrase_index:02d}",
@@ -84,6 +87,7 @@ def paraphrase_criterion_text(
     openrouter_api_key: str,
     openai_api_key: str | None = None,
     anthropic_api_key: str | None = None,
+    forbidden_texts: set[str] | None = None,
 ) -> str:
     provider = infer_model_provider(paraphrase_model)
     if provider == "openai":
@@ -96,6 +100,7 @@ def paraphrase_criterion_text(
         rubric_name=rubric_name,
         criterion_id=criterion_id,
         criterion_text=criterion_text,
+        forbidden_texts=forbidden_texts or set(),
     )
 
     last_error: Exception | None = None
@@ -109,11 +114,17 @@ def paraphrase_criterion_text(
                 prompt=prompt,
             )
             paraphrase = normalize_paraphrase_output(completion_text(completion))
-            if paraphrase and paraphrase != criterion_text:
+            if not paraphrase:
+                raise ValueError("Paraphrase model returned an empty criterion.")
+            if forbidden_texts and paraphrase in forbidden_texts:
+                raise ValueError(
+                    f"Paraphrase model returned a duplicate criterion for '{criterion_id}'."
+                )
+            if paraphrase != criterion_text:
                 return paraphrase
-            if paraphrase:
-                return paraphrase
-            raise ValueError("Paraphrase model returned an empty criterion.")
+            raise ValueError(
+                f"Paraphrase model returned the original criterion for '{criterion_id}'."
+            )
         except Exception as error:
             last_error = error
 
@@ -139,7 +150,7 @@ def create_paraphrase_completion(
         return client.messages.create(
             model=paraphrase_model.removeprefix("anthropic/"),
             max_tokens=1024,
-            temperature=0,
+            temperature=1,
             system=(
                 "You rewrite evaluation rubric criteria. "
                 "Return exactly one paraphrased criterion sentence. "
@@ -158,7 +169,7 @@ def create_paraphrase_completion(
     )
     kwargs = {
         "model": paraphrase_model.removeprefix("openai/") if provider == "openai" else paraphrase_model,
-        "temperature": 0,
+        "temperature": 1,
         "messages": [
             {
                 "role": "system",
@@ -208,14 +219,21 @@ def build_paraphrase_prompt(
     rubric_name: str,
     criterion_id: str,
     criterion_text: str,
+    forbidden_texts: set[str],
 ) -> str:
-    return (
+    prompt = (
         f"Rubric: {rubric_name}\n"
         f"Criterion id: {criterion_id}\n"
         f"Original criterion:\n{criterion_text}\n\n"
         "Rewrite this criterion in different wording while preserving the same evaluation meaning. "
         "Keep it as one criterion text only."
     )
+    if forbidden_texts:
+        prompt += (
+            "\nDo not return any of these existing phrasings:\n"
+            + "\n".join(f"- {text}" for text in sorted(forbidden_texts))
+        )
+    return prompt
 
 
 def normalize_paraphrase_output(content: str | None) -> str:
