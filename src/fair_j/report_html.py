@@ -598,6 +598,7 @@ def build_short_label(judge_model: str) -> str:
         "bedrock/claude-opus-4-8": "Claude Opus 4.8",
         "bedrock/claude-sonnet-4-6": "Claude Sonnet 4.6",
         "bedrock/gpt-oss-120b": "GPT OSS 120B",
+        "bedrock/qwen3-coder-30b-a3b": "Qwen3 Coder 30B A3B",
     }
     return known.get(judge_model, judge_model.rsplit("/", 1)[-1])
 
