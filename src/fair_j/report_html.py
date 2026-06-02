@@ -592,7 +592,6 @@ def build_short_label(judge_model: str) -> str:
         "qwen/qwen3-14b": "Qwen3 14B",
         "qwen/qwen3-32b": "Qwen3 32B",
         "bedrock/claude-haiku-4-5": "Claude Haiku 4.5",
-        "bedrock/claude-opus-4": "Claude Opus 4",
         "bedrock/claude-opus-4-5": "Claude Opus 4.5",
         "bedrock/claude-opus-4-7": "Claude Opus 4.7",
         "bedrock/claude-opus-4-8": "Claude Opus 4.8",
