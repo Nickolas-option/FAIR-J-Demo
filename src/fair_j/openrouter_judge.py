@@ -191,7 +191,10 @@ def call_bedrock_judge(
                 inferenceConfig=inference_config,
                 toolConfig=build_judge_tool_config(expected_ids),
             )
-            payload = extract_bedrock_tool_input(response)
+            try:
+                payload = extract_bedrock_tool_input(response)
+            except ValueError:
+                payload = extract_bedrock_text_payload(response)
             scores = extract_scores_payload(payload)
             if not isinstance(scores, dict):
                 raise ValueError("Bedrock tool input did not contain an object under 'scores'.")
@@ -416,6 +419,21 @@ def extract_bedrock_tool_input(response: dict) -> dict:
     stop_reason = response.get("stopReason", "unknown")
     raise ValueError(
         f"Bedrock response did not contain a 'report_scores' tool use (stopReason={stop_reason!r})."
+    )
+
+
+def extract_bedrock_text_payload(response: dict) -> dict:
+    for block in response.get("output", {}).get("message", {}).get("content", []):
+        text = block.get("text", "")
+        if text:
+            cleaned = strip_markdown_fences(text)
+            payload = json.loads(cleaned)
+            if not isinstance(payload, dict):
+                raise ValueError("Bedrock fallback text payload is not a JSON object.")
+            return payload
+    stop_reason = response.get("stopReason", "unknown")
+    raise ValueError(
+        f"Bedrock response had no toolUse and no parseable text content (stopReason={stop_reason!r})."
     )
 
 
