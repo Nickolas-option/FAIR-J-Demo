@@ -1,0 +1,16 @@
+{
+  "judge_model": "bedrock/gpt-oss-120b",
+  "paraphrase_model": "bedrock/claude-sonnet-4-6",
+  "dataset_path": "data/fed/fed_shikib_dataset.jsonl",
+  "rubric_path": "data/fed/fed_fairj_rubric_1-10.json",
+  "subset_name": "fed_shikib_dataset",
+  "scale_min": 1,
+  "scale_max": 10,
+  "seeds": 1,
+  "paraphrases_per_criterion": 5,
+  "limit_examples": null,
+  "dataset_format": "jsonl",
+  "dataset_id_column": "id",
+  "dataset_context_column": "context",
+  "dataset_candidate_column": "candidate"
+}
