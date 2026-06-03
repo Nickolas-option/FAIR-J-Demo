@@ -1,0 +1,25 @@
+{
+  "name": "summeval_golden_v1",
+  "scale": {
+    "min": 1,
+    "max": 5
+  },
+  "criteria": [
+    {
+      "id": "coherence",
+      "text": "The summary should be well-structured and well-organized. The summary should not just be a heap of related information, but should build from sentence to sentence to a coherent body of information about a topic."
+    },
+    {
+      "id": "consistency",
+      "text": "The factual alignment between the summary and the summarized source. A factually consistent summary contains only statements that are entailed by the source document. Penalize summaries that contain hallucinated facts."
+    },
+    {
+      "id": "fluency",
+      "text": "The quality of individual sentences. Sentences in the summary should have no formatting problems, capitalization errors or obviously ungrammatical sentences that make the text difficult to read."
+    },
+    {
+      "id": "relevance",
+      "text": "Selection of important content from the source. The summary should include only important information from the source document. Penalize summaries that contain redundancies and excess information."
+    }
+  ]
+}
