@@ -1,0 +1,184 @@
+[
+  {
+    "perturbation": "baseline",
+    "rubric_name": "summeval_golden_v1",
+    "criteria": [
+      {
+        "id": "coherence",
+        "text": "The summary should be well-structured and well-organized. The summary should not just be a heap of related information, but should build from sentence to sentence to a coherent body of information about a topic."
+      },
+      {
+        "id": "consistency",
+        "text": "The factual alignment between the summary and the summarized source. A factually consistent summary contains only statements that are entailed by the source document. Penalize summaries that contain hallucinated facts."
+      },
+      {
+        "id": "fluency",
+        "text": "The quality of individual sentences. Sentences in the summary should have no formatting problems, capitalization errors or obviously ungrammatical sentences that make the text difficult to read."
+      },
+      {
+        "id": "relevance",
+        "text": "Selection of important content from the source. The summary should include only important information from the source document. Penalize summaries that contain redundancies and excess information."
+      }
+    ]
+  },
+  {
+    "perturbation": "paraphrase__coherence__01",
+    "rubric_name": "summeval_golden_v1",
+    "criteria": [
+      {
+        "id": "coherence",
+        "text": "The summary must have clear logical flow and organization, building progressively from one sentence to the next rather than presenting disconnected facts, so that the content forms a unified and cohesive whole."
+      },
+      {
+        "id": "consistency",
+        "text": "The factual alignment between the summary and the summarized source. A factually consistent summary contains only statements that are entailed by the source document. Penalize summaries that contain hallucinated facts."
+      },
+      {
+        "id": "fluency",
+        "text": "The quality of individual sentences. Sentences in the summary should have no formatting problems, capitalization errors or obviously ungrammatical sentences that make the text difficult to read."
+      },
+      {
+        "id": "relevance",
+        "text": "Selection of important content from the source. The summary should include only important information from the source document. Penalize summaries that contain redundancies and excess information."
+      }
+    ]
+  },
+  {
+    "perturbation": "paraphrase__consistency__01",
+    "rubric_name": "summeval_golden_v1",
+    "criteria": [
+      {
+        "id": "coherence",
+        "text": "The summary should be well-structured and well-organized. The summary should not just be a heap of related information, but should build from sentence to sentence to a coherent body of information about a topic."
+      },
+      {
+        "id": "consistency",
+        "text": "Rate the degree to which the summary's claims are factually supported by the source document, deducting points for any invented or unsupported information not grounded in the original text."
+      },
+      {
+        "id": "fluency",
+        "text": "The quality of individual sentences. Sentences in the summary should have no formatting problems, capitalization errors or obviously ungrammatical sentences that make the text difficult to read."
+      },
+      {
+        "id": "relevance",
+        "text": "Selection of important content from the source. The summary should include only important information from the source document. Penalize summaries that contain redundancies and excess information."
+      }
+    ]
+  },
+  {
+    "perturbation": "paraphrase__fluency__01",
+    "rubric_name": "summeval_golden_v1",
+    "criteria": [
+      {
+        "id": "coherence",
+        "text": "The summary should be well-structured and well-organized. The summary should not just be a heap of related information, but should build from sentence to sentence to a coherent body of information about a topic."
+      },
+      {
+        "id": "consistency",
+        "text": "The factual alignment between the summary and the summarized source. A factually consistent summary contains only statements that are entailed by the source document. Penalize summaries that contain hallucinated facts."
+      },
+      {
+        "id": "fluency",
+        "text": "Each sentence should be well-formed, free of grammatical errors, capitalization mistakes, or formatting issues that would impede readability."
+      },
+      {
+        "id": "relevance",
+        "text": "Selection of important content from the source. The summary should include only important information from the source document. Penalize summaries that contain redundancies and excess information."
+      }
+    ]
+  },
+  {
+    "perturbation": "paraphrase__relevance__01",
+    "rubric_name": "summeval_golden_v1",
+    "criteria": [
+      {
+        "id": "coherence",
+        "text": "The summary should be well-structured and well-organized. The summary should not just be a heap of related information, but should build from sentence to sentence to a coherent body of information about a topic."
+      },
+      {
+        "id": "consistency",
+        "text": "The factual alignment between the summary and the summarized source. A factually consistent summary contains only statements that are entailed by the source document. Penalize summaries that contain hallucinated facts."
+      },
+      {
+        "id": "fluency",
+        "text": "The quality of individual sentences. Sentences in the summary should have no formatting problems, capitalization errors or obviously ungrammatical sentences that make the text difficult to read."
+      },
+      {
+        "id": "relevance",
+        "text": "The summary should capture only the key information from the source document, focusing on what matters most while avoiding unnecessary repetition or superfluous details."
+      }
+    ]
+  },
+  {
+    "perturbation": "delete__coherence",
+    "rubric_name": "summeval_golden_v1",
+    "criteria": [
+      {
+        "id": "consistency",
+        "text": "The factual alignment between the summary and the summarized source. A factually consistent summary contains only statements that are entailed by the source document. Penalize summaries that contain hallucinated facts."
+      },
+      {
+        "id": "fluency",
+        "text": "The quality of individual sentences. Sentences in the summary should have no formatting problems, capitalization errors or obviously ungrammatical sentences that make the text difficult to read."
+      },
+      {
+        "id": "relevance",
+        "text": "Selection of important content from the source. The summary should include only important information from the source document. Penalize summaries that contain redundancies and excess information."
+      }
+    ]
+  },
+  {
+    "perturbation": "delete__consistency",
+    "rubric_name": "summeval_golden_v1",
+    "criteria": [
+      {
+        "id": "coherence",
+        "text": "The summary should be well-structured and well-organized. The summary should not just be a heap of related information, but should build from sentence to sentence to a coherent body of information about a topic."
+      },
+      {
+        "id": "fluency",
+        "text": "The quality of individual sentences. Sentences in the summary should have no formatting problems, capitalization errors or obviously ungrammatical sentences that make the text difficult to read."
+      },
+      {
+        "id": "relevance",
+        "text": "Selection of important content from the source. The summary should include only important information from the source document. Penalize summaries that contain redundancies and excess information."
+      }
+    ]
+  },
+  {
+    "perturbation": "delete__fluency",
+    "rubric_name": "summeval_golden_v1",
+    "criteria": [
+      {
+        "id": "coherence",
+        "text": "The summary should be well-structured and well-organized. The summary should not just be a heap of related information, but should build from sentence to sentence to a coherent body of information about a topic."
+      },
+      {
+        "id": "consistency",
+        "text": "The factual alignment between the summary and the summarized source. A factually consistent summary contains only statements that are entailed by the source document. Penalize summaries that contain hallucinated facts."
+      },
+      {
+        "id": "relevance",
+        "text": "Selection of important content from the source. The summary should include only important information from the source document. Penalize summaries that contain redundancies and excess information."
+      }
+    ]
+  },
+  {
+    "perturbation": "delete__relevance",
+    "rubric_name": "summeval_golden_v1",
+    "criteria": [
+      {
+        "id": "coherence",
+        "text": "The summary should be well-structured and well-organized. The summary should not just be a heap of related information, but should build from sentence to sentence to a coherent body of information about a topic."
+      },
+      {
+        "id": "consistency",
+        "text": "The factual alignment between the summary and the summarized source. A factually consistent summary contains only statements that are entailed by the source document. Penalize summaries that contain hallucinated facts."
+      },
+      {
+        "id": "fluency",
+        "text": "The quality of individual sentences. Sentences in the summary should have no formatting problems, capitalization errors or obviously ungrammatical sentences that make the text difficult to read."
+      }
+    ]
+  }
+]
