@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import random
 import re
 import sys
 import time
@@ -212,11 +213,34 @@ def call_bedrock_judge(
             last_error = error
             report_retry_error("bedrock", attempt, BEDROCK_JUDGE_MAX_RETRIES, error)
             if attempt < BEDROCK_JUDGE_MAX_RETRIES:
-                time.sleep(2 ** attempt)
+                if is_bedrock_throttle(error):
+                    sleep_s = 30 * attempt + random.uniform(0, 10)
+                else:
+                    sleep_s = 2 ** attempt
+                time.sleep(sleep_s)
 
     raise RuntimeError(
         f"Bedrock judge call failed after {BEDROCK_JUDGE_MAX_RETRIES} attempts."
     ) from last_error
+
+
+BEDROCK_THROTTLE_ERROR_NAMES = {
+    "ThrottlingException",
+    "TooManyRequestsException",
+    "ServiceUnavailableException",
+    "ModelNotReadyException",
+}
+
+
+def is_bedrock_throttle(error: Exception) -> bool:
+    if type(error).__name__ in BEDROCK_THROTTLE_ERROR_NAMES:
+        return True
+    response = getattr(error, "response", None)
+    if isinstance(response, dict):
+        code = response.get("Error", {}).get("Code")
+        if code in BEDROCK_THROTTLE_ERROR_NAMES:
+            return True
+    return False
 
 
 def call_openai_judge(
