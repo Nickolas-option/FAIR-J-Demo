@@ -1,1 +1,2 @@
-*.jsonl filter=lfs diff=lfs merge=lfs -text
+runs/2026-06-04T10-44-12__multi_7models__summeval_dataset__1-5/**/*.jsonl filter=lfs diff=lfs merge=lfs -text
+runs/2026-06-05T13-46-48__multi_5models__summeval_dataset__1-5/**/*.jsonl filter=lfs diff=lfs merge=lfs -text
