@@ -8,14 +8,15 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 TOTAL_CRITERION_ID = "__total__"
+MAX_EXAMPLE_VIEWER_RECORDS_PER_MODEL = 100
 STAT_TEST_GROUPS = (
     ("paraphrases_vs_baseline", "Paraphrased vs Base"),
     ("deletions_vs_baseline", "Deleted vs Base"),
 )
 SECTION_EXPLANATIONS = {
     "dataset_level": (
-        "Are scores stable when the same criterion is paraphrased? Lower score "
-        "stability values and lower spillover mean cleaner dataset-level comparisons."
+        "How much do scores change when the same criterion is paraphrased? Lower score "
+        "instability values and lower spillover mean cleaner dataset-level comparisons."
     ),
     "ranking_consistency": (
         "Does the judge preserve example ordering when the same criterion is "
@@ -52,7 +53,7 @@ METRIC_HELP = {
     "paired_permutation_test": "Permutation test p-value for paired differences.",
 }
 DATASET_OVERVIEW_ROWS = (
-    ("mad_paraphrases_same_criterion_scale_normalized", "Score Stability"),
+    ("mad_paraphrases_same_criterion_scale_normalized", "Score Instability"),
     ("spillover_ratio", "Spillover"),
 )
 RANKING_OVERVIEW_ROWS = (
@@ -85,6 +86,12 @@ class ModelReport:
     run_dir: Path
     run_meta: dict[str, object]
     data: dict[str, object]
+
+
+@dataclass(frozen=True)
+class ReportExampleData:
+    records: list[dict[str, object]]
+    examples_used: int | None
 
 
 def render_comparison_report(run_dirs: list[Path], output_path: Path, title: str | None = None) -> Path:
@@ -126,13 +133,13 @@ def build_template_environment() -> Environment:
 
 def build_template_context(reports: list[ModelReport], title: str) -> dict[str, object]:
     criteria = get_display_criteria(reports)
+    example_data = build_report_example_data(reports)
+    example_records = [
+        record for report in reports for record in example_data[report.run_dir].records
+    ]
     return {
         "title": title,
-        "controls": {
-            "open_all_label": "Expand All Sections",
-            "close_all_label": "Collapse All Sections",
-        },
-        "run_context": build_run_context_context(reports),
+        "run_context": build_run_context_context(reports, example_data),
         "methodology": build_methodology_context(),
         "summary_cards": build_summary_cards_context(reports, criteria),
         "dataset_calculator": build_dataset_calculator_context(reports, criteria),
@@ -154,41 +161,30 @@ def build_template_context(reports: list[ModelReport], title: str) -> dict[str, 
         ),
         "criterion_sections": build_criterion_sections_context(reports, criteria),
         "stat_explorer": build_stat_tests_explorer_context(reports, criteria),
-        "scripts": build_page_scripts_context(reports, criteria),
+        "example_viewer": {
+            "enabled": bool(example_records),
+            "title": "Example Viewer",
+            "description": (
+                "Compare real examples where the judge score changed after paraphrasing "
+                "the evaluated criterion."
+            ),
+        },
+        "scripts": build_page_scripts_context(reports, criteria, example_records),
     }
 
 
 def build_summary_cards_context(reports: list[ModelReport], criteria: list[str]) -> list[dict[str, object]]:
     cards: list[dict[str, object]] = []
     for report in reports:
-        score_stability = fetch_dataset_metric(
+        score_instability = fetch_dataset_metric(
             report, "mad_paraphrases_same_criterion_scale_normalized", criteria
         )
         avg_flip = fetch_ranking_metric(report, "flip_rate_paraphrases_same_criterion", criteria)
         ranking_stability = fetch_ranking_metric(report, "kendall_paraphrases_same_criterion_mean", criteria)
         spillover = fetch_dataset_metric(report, "spillover_ratio", criteria)
-        if None in (score_stability, avg_flip, ranking_stability, spillover):
-            verdict = "N/A"
-            verdict_class = "muted"
-            reason = "One or more summary metrics are unavailable in core_output.json."
-        elif avg_flip < 8.0 and score_stability <= 0.08 and ranking_stability >= 0.80 and spillover < 0.5:
-            verdict = "Stable"
-            verdict_class = "good"
-            reason = "Low flips, stable same-criterion scores, and limited spillover."
-        elif avg_flip < 18.0 and score_stability <= 0.12 and ranking_stability >= 0.65 and spillover < 1.0:
-            verdict = "Review"
-            verdict_class = "warn"
-            reason = "Usable, but one or more stability signals are only moderate."
-        else:
-            verdict = "High Variance"
-            verdict_class = "bad"
-            reason = "Score stability, ranking stability, or spillover is outside the preferred range."
         cards.append(
             {
                 "label": report.label,
-                "verdict": verdict,
-                "verdict_class": verdict_class,
-                "reason": reason,
                 "stats": [
                     {
                         "label": "Flips",
@@ -196,8 +192,8 @@ def build_summary_cards_context(reports: list[ModelReport], criteria: list[str])
                         "help_text": METRIC_HELP["flip_rate_paraphrases_same_criterion"],
                     },
                     {
-                        "label": "Score Stability",
-                        "value": format_optional_number(score_stability, digits=4),
+                        "label": "Score Instability",
+                        "value": format_optional_number(score_instability, digits=4),
                         "help_text": METRIC_HELP["mad_paraphrases_same_criterion_scale_normalized"],
                     },
                     {
@@ -219,7 +215,7 @@ def build_summary_cards_context(reports: list[ModelReport], criteria: list[str])
 def build_dataset_calculator_context(reports: list[ModelReport], criteria: list[str]) -> dict[str, object]:
     return {
         "title": "Noise Calculator",
-        "description": "Estimate how same-criterion score stability shrinks as dataset size grows.",
+        "description": "Estimate how same-criterion score instability shrinks as dataset size grows.",
         "input_label": "Dataset Size (N):",
         "default_value": 1000,
         "calc_data": {
@@ -230,7 +226,9 @@ def build_dataset_calculator_context(reports: list[ModelReport], criteria: list[
     }
 
 
-def build_run_context_context(reports: list[ModelReport]) -> dict[str, object]:
+def build_run_context_context(
+    reports: list[ModelReport], example_data: dict[Path, ReportExampleData]
+) -> dict[str, object]:
     return {
         "title": "Run Context",
         "cards": [
@@ -239,7 +237,10 @@ def build_run_context_context(reports: list[ModelReport]) -> dict[str, object]:
                 "rows": [
                     ("Judge model", str(report.run_meta.get("judge_model", "-"))),
                     ("Paraphrase model", str(report.run_meta.get("paraphrase_model") or "-")),
-                    ("Examples used", format_optional_int(report.run_meta.get("limit_examples"))),
+                    (
+                        "Examples used",
+                        format_optional_int(example_data[report.run_dir].examples_used),
+                    ),
                     (
                         "Paraphrases per criterion",
                         format_optional_int(report.run_meta.get("paraphrases_per_criterion")),
@@ -266,7 +267,7 @@ def build_methodology_context() -> dict[str, object]:
         ),
         "rows": [
             {
-                "label": "Score Stability",
+                "label": "Score Instability",
                 "meaning": "How much the score changes when the same criterion is paraphrased.",
                 "formula": "same-criterion MAD / scale span",
             },
@@ -322,7 +323,7 @@ def build_criterion_sections_context(
                 "title": format_criterion_label(criterion_id),
                 "groups": [
                     {
-                        "title": "Scoring Stability",
+                        "title": "Scoring Instability",
                         "table": build_matrix_table_context(
                             reports,
                             DATASET_OVERVIEW_ROWS,
@@ -406,13 +407,237 @@ def build_matrix_table_context(
     }
 
 
-def build_page_scripts_context(reports: list[ModelReport], criteria: list[str]) -> dict[str, object]:
+def build_page_scripts_context(
+    reports: list[ModelReport],
+    criteria: list[str],
+    example_records: list[dict[str, object]],
+) -> dict[str, object]:
     calc_data = {
         report.label: fetch_dataset_metric(report, "mad_paraphrases_same_criterion_scale_normalized", criteria)
         or 0.0
         for report in reports
     }
-    return {"calc_data_json": json.dumps(calc_data)}
+    return {
+        "calc_data_json": json.dumps(calc_data),
+        "example_records_json": json.dumps(
+            example_records, ensure_ascii=False, separators=(",", ":")
+        ).replace("</", "<\\/"),
+    }
+
+
+def build_report_example_data(reports: list[ModelReport]) -> dict[Path, ReportExampleData]:
+    dataset_cache: dict[Path, dict[str, dict[str, object]]] = {}
+    return {
+        report.run_dir: load_report_example_data(report, dataset_cache) for report in reports
+    }
+
+
+def load_report_example_data(
+    report: ModelReport,
+    dataset_cache: dict[Path, dict[str, dict[str, object]]],
+) -> ReportExampleData:
+    score_log_path = report.run_dir / "score_log.jsonl"
+    configured_limit = optional_int(report.run_meta.get("limit_examples"))
+    dataset_path = resolve_run_path(report, report.run_meta.get("dataset_path"))
+    dataset_records: dict[str, dict[str, object]] = {}
+    if dataset_path is not None:
+        if dataset_path not in dataset_cache:
+            dataset_cache[dataset_path] = load_dataset_records(dataset_path, report.run_meta)
+        dataset_records = dataset_cache[dataset_path]
+
+    if not score_log_path.exists():
+        examples_used = configured_limit
+        if examples_used is None and dataset_records:
+            examples_used = len(dataset_records)
+        return ReportExampleData(records=[], examples_used=examples_used)
+
+    baselines, observed_example_ids = load_baseline_scores(score_log_path)
+    examples_used = len(observed_example_ids)
+    variants_path = report.run_dir / "variants.json"
+    if not variants_path.exists() or not dataset_records:
+        return ReportExampleData(records=[], examples_used=examples_used)
+
+    baseline_criteria, changed_variants = load_changed_variants(variants_path)
+    records = collect_changed_score_examples(
+        report=report,
+        score_log_path=score_log_path,
+        dataset_records=dataset_records,
+        baselines=baselines,
+        baseline_criteria=baseline_criteria,
+        changed_variants=changed_variants,
+    )
+    return ReportExampleData(records=records, examples_used=examples_used)
+
+
+def resolve_run_path(report: ModelReport, raw_path: object) -> Path | None:
+    if not isinstance(raw_path, str) or not raw_path:
+        return None
+    path = Path(raw_path).expanduser()
+    candidates = [path] if path.is_absolute() else [Path.cwd() / path]
+    if not path.is_absolute():
+        candidates.extend(parent / path for parent in (report.run_dir, *report.run_dir.parents))
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate.resolve()
+    return None
+
+
+def load_dataset_records(
+    dataset_path: Path, run_meta: dict[str, object]
+) -> dict[str, dict[str, object]]:
+    if dataset_path.suffix.lower() == ".json":
+        payload = json.loads(dataset_path.read_text(encoding="utf-8"))
+        if not isinstance(payload, list):
+            raise ValueError(f"Expected a JSON array in {dataset_path}")
+        rows = payload
+    else:
+        rows = [
+            json.loads(line)
+            for line in dataset_path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+    id_column = str(run_meta.get("dataset_id_column") or "id")
+    records: dict[str, dict[str, object]] = {}
+    for row in rows:
+        if not isinstance(row, dict) or id_column not in row:
+            continue
+        records[str(row[id_column])] = row
+    return records
+
+
+def load_baseline_scores(
+    score_log_path: Path,
+) -> tuple[dict[tuple[str, str, str], float], set[str]]:
+    baselines: dict[tuple[str, str, str], float] = {}
+    example_ids: set[str] = set()
+    with score_log_path.open(encoding="utf-8") as handle:
+        for line in handle:
+            row = json.loads(line)
+            example_id = str(row["example_id"])
+            example_ids.add(example_id)
+            score = safe_float(row.get("score"))
+            if row.get("perturbation") != "baseline" or score is None:
+                continue
+            key = (example_id, str(row["criterion_id"]), str(row["seed"]))
+            baselines[key] = score
+    return baselines, example_ids
+
+
+def load_changed_variants(
+    variants_path: Path,
+) -> tuple[dict[str, str], dict[str, tuple[str, str]]]:
+    variants = json.loads(variants_path.read_text(encoding="utf-8"))
+    if not isinstance(variants, list):
+        raise ValueError(f"Expected a JSON array in {variants_path}")
+    baseline_variant = next(
+        (
+            variant
+            for variant in variants
+            if isinstance(variant, dict) and variant.get("perturbation") == "baseline"
+        ),
+        None,
+    )
+    if not isinstance(baseline_variant, dict) or not isinstance(
+        baseline_variant.get("criteria"), list
+    ):
+        raise ValueError(f"Missing baseline criteria in {variants_path}")
+    baseline_criteria = {
+        str(criterion["id"]): str(criterion["text"])
+        for criterion in baseline_variant["criteria"]
+        if isinstance(criterion, dict) and "id" in criterion and "text" in criterion
+    }
+    changed_variants: dict[str, tuple[str, str]] = {}
+    for variant in variants:
+        if not isinstance(variant, dict):
+            continue
+        perturbation = str(variant.get("perturbation", ""))
+        criteria = variant.get("criteria")
+        if not perturbation.startswith("paraphrase__") or not isinstance(criteria, list):
+            continue
+        for criterion in criteria:
+            if not isinstance(criterion, dict) or "id" not in criterion or "text" not in criterion:
+                continue
+            criterion_id = str(criterion["id"])
+            criterion_text = str(criterion["text"])
+            if baseline_criteria.get(criterion_id) != criterion_text:
+                changed_variants[perturbation] = (criterion_id, criterion_text)
+                break
+    return baseline_criteria, changed_variants
+
+
+def collect_changed_score_examples(
+    *,
+    report: ModelReport,
+    score_log_path: Path,
+    dataset_records: dict[str, dict[str, object]],
+    baselines: dict[tuple[str, str, str], float],
+    baseline_criteria: dict[str, str],
+    changed_variants: dict[str, tuple[str, str]],
+) -> list[dict[str, object]]:
+    context_column = str(report.run_meta.get("dataset_context_column") or "context")
+    candidate_column = str(report.run_meta.get("dataset_candidate_column") or "candidate")
+    strongest_by_pair: dict[tuple[str, str, str], dict[str, object]] = {}
+    with score_log_path.open(encoding="utf-8") as handle:
+        for line in handle:
+            row = json.loads(line)
+            perturbation = str(row.get("perturbation", ""))
+            changed_variant = changed_variants.get(perturbation)
+            score = safe_float(row.get("score"))
+            if changed_variant is None or score is None:
+                continue
+            criterion_id, paraphrased_criterion = changed_variant
+            if str(row["criterion_id"]) != criterion_id:
+                continue
+            example_id = str(row["example_id"])
+            seed = str(row["seed"])
+            baseline_score = baselines.get((example_id, criterion_id, seed))
+            dataset_record = dataset_records.get(example_id)
+            if baseline_score is None or dataset_record is None:
+                continue
+            delta = score - baseline_score
+            if delta == 0:
+                continue
+            record = {
+                "model": report.label,
+                "example_id": example_id,
+                "criterion_id": criterion_id,
+                "seed": row["seed"],
+                "original_criterion": baseline_criteria[criterion_id],
+                "paraphrased_criterion": paraphrased_criterion,
+                "baseline_score": normalize_score(baseline_score),
+                "paraphrased_score": normalize_score(score),
+                "delta": normalize_score(delta),
+                "context": str(dataset_record.get(context_column, "")),
+                "candidate": str(dataset_record.get(candidate_column, "")),
+            }
+            pair_key = (example_id, criterion_id, paraphrased_criterion)
+            previous = strongest_by_pair.get(pair_key)
+            if previous is None or abs(delta) > abs(float(previous["delta"])):
+                strongest_by_pair[pair_key] = record
+    ranked = sorted(
+        strongest_by_pair.values(),
+        key=lambda item: (
+            -abs(float(item["delta"])),
+            str(item["criterion_id"]),
+            str(item["example_id"]),
+            str(item["paraphrased_criterion"]),
+        ),
+    )
+    return ranked[:MAX_EXAMPLE_VIEWER_RECORDS_PER_MODEL]
+
+
+def normalize_score(value: float) -> int | float:
+    return int(value) if value.is_integer() else value
+
+
+def optional_int(value: object) -> int | None:
+    if isinstance(value, bool) or value is None:
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    return None
 
 
 def get_display_criteria(reports: list[ModelReport]) -> list[str]:
@@ -579,7 +804,7 @@ def mean_non_null(values: list[float | None]) -> float | None:
 
 
 def build_default_title(reports: list[ModelReport]) -> str:
-    return "FAIR-J report"
+    return "FAIR-J: LLM-as-a-Judge Robustness Report"
 
 
 def build_short_label(judge_model: str) -> str:
