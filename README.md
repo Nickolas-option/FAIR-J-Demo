@@ -280,35 +280,6 @@ Supported dataset formats:
 
 ## Commands
 
-The minimal example uses 3 files:
-
-- `examples/run_subset_dataset.jsonl`
-- `examples/run_subset_rubric.json`
-- `examples/run_pipeline.sh`
-
-If you want to run everything from the script:
-
-```bash
-export OPENROUTER_API_KEY=your_openrouter_key
-uv sync
-chmod +x examples/run_pipeline.sh
-./examples/run_pipeline.sh
-```
-
-If you prefer a fully manual one-command run:
-
-```bash
-uv run fair-j run-pipeline \
-  --judge-model qwen/qwen3-8b \
-  --paraphrase-model qwen/qwen3-8b \
-  --openrouter-api-key "$OPENROUTER_API_KEY" \
-  --dataset-path examples/run_subset_dataset.jsonl \
-  --rubric-path examples/run_subset_rubric.json \
-  --workers 1 \
-  --seeds 1 \
-  --paraphrases-per-criterion 1
-```
-
 Run the full evaluation pipeline in one command:
 
 ```bash
